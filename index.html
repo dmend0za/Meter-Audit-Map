@@ -383,14 +383,27 @@
             .addTo(map);
 
             // Add event listener to the button after popup is added to DOM
-            currentPopup.on('open', () => {
+            // Use setTimeout to ensure DOM is fully rendered
+            setTimeout(() => {
                 const button = document.getElementById(`audit-btn-${props.name}`);
+                console.log('Looking for button with ID:', `audit-btn-${props.name}`);
+                console.log('Button found:', button);
+                
                 if (button) {
-                    button.addEventListener('click', () => {
+                    console.log('Adding click event listener to button');
+                    button.addEventListener('click', (e) => {
+                        console.log('Button clicked!');
+                        e.preventDefault();
+                        e.stopPropagation();
                         startAudit(props.name, meterData.link);
                     });
+                    
+                    // Also add visual feedback on hover
+                    button.style.cursor = 'pointer';
+                } else {
+                    console.error('Button not found in DOM');
                 }
-            });
+            }, 100);
 
             // Clear reference when popup is closed
             currentPopup.on('close', () => {
