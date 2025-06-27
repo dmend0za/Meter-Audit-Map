@@ -126,7 +126,7 @@
         // Configuration
         const MAPBOX_TOKEN = 'pk.eyJ1IjoiZmllbGRzZW5zZSIsImEiOiJjbWMwb2ljY3YwNGFoMnJvaXN5c2xnMnR6In0.wc3C3TrsgsfyLf5ZJqHpnA';
         const FILLOUT_FORM_BASE_URL = 'https://form.fillout.com/t/aKNfdeajwuus';
-        const GEOJSON_URL = 'https://raw.githubusercontent.com/dmend0za/Meter-Audit-Map/main/MeterIns.geojson';
+        const GEOJSON_URL = 'https://raw.githubusercontent.com/dmend0za/Meter-Audit-Map/main/MetersInsp.geojson';
         const GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/15dpFfp3H33r5ycWW3hwysAPkQFLO4Sjc0JhXuzkv_Ek/edit?gid=0#gid=0';
         
         let map;
@@ -163,25 +163,36 @@
         // Load meter data from GeoJSON
         async function loadMeterData() {
             try {
+                console.log('Attempting to load data from:', GEOJSON_URL);
                 const response = await fetch(GEOJSON_URL);
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}. Please ensure MetersInsp.geojson file exists in your GitHub repository.`);
                 }
                 
                 const data = await response.json();
-                allMeters = data.features || [];
+                console.log('Data loaded successfully:', data);
+                
+                if (!data.features || !Array.isArray(data.features)) {
+                    throw new Error('Invalid GeoJSON format: features array not found');
+                }
+                
+                allMeters = data.features;
+                console.log(`Loaded ${allMeters.length} meters`);
                 
                 // Check completed meters from localStorage
                 const stored = localStorage.getItem('completedMeters');
                 if (stored) {
                     completedMeterIds = new Set(JSON.parse(stored));
+                    console.log(`Found ${completedMeterIds.size} completed meters in local storage`);
                 }
                 
                 addMarkersToMap();
                 updateStats();
                 
             } catch (error) {
-                showError('Failed to load meter data: ' + error.message);
+                console.error('Error loading meter data:', error);
+                showError('Failed to load meter data: ' + error.message + '\n\nPlease ensure the MetersInsp.geojson file exists in your GitHub repository.');
             }
         }
 
