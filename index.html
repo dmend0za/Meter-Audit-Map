@@ -1,1 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Audit Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
 
+  <script>
+    // 🔑 Mapbox access token
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZmllbGRzZW5zZSIsImEiOiJjbWMwb2ljY3YwNGFoMnJvaXN5c2xnMnR6In0.wc3C3TrsgsfyLf5ZJqHpnA';
+
+    // 🗺️ Initialize the map
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [-78.134, 35.231], // Adjust to your area
+      zoom: 10
+    });
+
+    // 📊 Google Sheets + Fillout data
+    const sheetURL = 'https://opensheet.elk.sh/15dpFfp3H33r5ycWW3hwysAPkQFLO4Sjc0JhXuzkv_Ek/Responses';
+    const geojsonURL = 'https://rawcdn.githack.com/dmend0za/Meter-Audit-Map/a3b84847b695c9d3235f944e442013867a1b1c23/MetersInsp.geojson'; // 🔁 Replace this with your actual raw URL
+
+    // 🧠 Load markers from GeoJSON, filtering out "Complete" ones based on sheet
+    async function loadData() {
+      try {
+        const [sheetRes, geoRes] = await Promise.all([
+          fetch(sheetURL),
+          fetch(geojsonURL)
+        ]);
+
+        const sheetData = await sheetRes.json();
+        const geojsonData = await geoRes.json();
+
+        // 📌 Build list of Loc_IDs with completed status
+        const completedIDs = new Set(
+          sheetData
+            .filter(row => (row.Status || '').trim().toLowerCase() === 'complete')
+            .map(row => (row.Loc_ID || row["Location ID"] || '').trim())
+        );
+
+        // 📍 Show marker for each incomplete audit location
+        geojsonData.features.forEach(feature => {
+          const props = feature.properties;
+          const coords = feature.geometry.coordinates;
+          const locID = (props.Loc_ID || props["Location ID"] || '').trim();
+
+          if (!completedIDs.has(locID)) {
+            const url = props.Link || props.URL || props.href || "#";
+
+            const popupHTML = `
+              <strong>Meter ID:</strong> ${props.Meter_Number || "N/A"}<br>
+              <strong>Address:</strong> ${props.Address || "N/A"}<br>
+              <a href="${url}" target="_blank">📝 Start Audit</a>
+            `;
+
+            new mapboxgl.Marker()
+              .setLngLat(coords)
+              .setPopup(new mapboxgl.Popup().setHTML(popupHTML))
+              .addTo(map);
+          }
+        });
+      } catch (err) {
+        console.error("Error loading data:", err);
+      }
+    }
+
+    // 🚀 Initial marker load
+    loadData();
+
+    // 🔁 Refresh every 30 seconds to update map in real time
+    setInterval(() => {
+      document.querySelectorAll('.mapboxgl-marker').forEach(marker => marker.remove());
+      loadData();
+    }, 30000);
+  </script>
+</body>
+</html>
