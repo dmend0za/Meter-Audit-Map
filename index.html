@@ -132,6 +132,7 @@
         let map;
         let allMeters = [];
         let completedMeterIds = new Set();
+        let currentPopup = null; // Store reference to current popup
 
         // Initialize map
         function initializeMap() {
@@ -332,6 +333,7 @@
             console.log('Meter data for popup:', meterData);
             console.log('Audit link:', meterData.link);
             
+            // Create popup content without inline onclick handlers
             const popupContent = `
                 <div class="popup-header">${meterData.address || 'Unknown Address'}</div>
                 <div class="popup-info">
@@ -349,18 +351,39 @@
                 <div class="popup-info">
                     <span class="popup-label">Customer:</span> ${meterData.customer || 'N/A'}
                 </div>
-                <button class="audit-button" onclick="startAudit('${props.name}', '${meterData.link}')">
+                <button class="audit-button" id="audit-btn-${props.name}">
                     Start Audit
                 </button>
             `;
 
-            new mapboxgl.Popup({
+            // Close any existing popup
+            if (currentPopup) {
+                currentPopup.remove();
+            }
+
+            // Create new popup
+            currentPopup = new mapboxgl.Popup({
                 closeOnClick: true,
                 closeButton: true
             })
             .setLngLat(coordinates)
             .setHTML(popupContent)
             .addTo(map);
+
+            // Add event listener to the button after popup is added to DOM
+            currentPopup.on('open', () => {
+                const button = document.getElementById(`audit-btn-${props.name}`);
+                if (button) {
+                    button.addEventListener('click', () => {
+                        startAudit(props.name, meterData.link);
+                    });
+                }
+            });
+
+            // Clear reference when popup is closed
+            currentPopup.on('close', () => {
+                currentPopup = null;
+            });
         }
 
         // Extract meter data from HTML description
@@ -432,7 +455,7 @@
                             if (!data.link) {
                                 const innerHTML = cells[1].innerHTML;
                                 console.log('Checking innerHTML:', innerHTML);
-                                const linkMatch = innerHTML.match(/href="([^"]*)/);
+                                const linkMatch = innerHTML.match(/href="([^"]*)"/);
                                 if (linkMatch) {
                                     let href = linkMatch[1];
                                     href = href.replace(/&amp;/g, '&');
@@ -481,21 +504,46 @@
             console.log('Starting audit for meter:', meterName);
             console.log('Audit link:', auditLink);
             
-            if (!auditLink || auditLink === 'undefined') {
+            if (!auditLink || auditLink === 'undefined' || auditLink === 'null') {
                 showError('Unable to generate audit link for this meter. Please check the meter data.');
+                return;
+            }
+            
+            // Validate the link format
+            if (!auditLink.startsWith('https://form.fillout.com')) {
+                showError('Invalid audit link format. Expected FillOut form URL.');
                 return;
             }
             
             // Mark as completed first
             markAsCompleted(meterName);
             
+            // Close popup
+            if (currentPopup) {
+                currentPopup.remove();
+                currentPopup = null;
+            }
+            
             // Open the audit form in a new tab/window
             try {
-                window.open(auditLink, '_blank', 'noopener,noreferrer');
+                console.log('Attempting to open:', auditLink);
+                const newWindow = window.open(auditLink, '_blank', 'noopener,noreferrer');
+                
+                if (!newWindow) {
+                    // Popup blocker might have prevented opening
+                    console.log('Popup blocked, trying alternative method...');
+                    // Create a temporary link and click it
+                    const tempLink = document.createElement('a');
+                    tempLink.href = auditLink;
+                    tempLink.target = '_blank';
+                    tempLink.rel = 'noopener noreferrer';
+                    document.body.appendChild(tempLink);
+                    tempLink.click();
+                    document.body.removeChild(tempLink);
+                }
             } catch (error) {
                 console.error('Error opening audit link:', error);
-                // Fallback: try to navigate to the link
-                window.location.href = auditLink;
+                showError('Error opening audit form: ' + error.message);
             }
         }
 
