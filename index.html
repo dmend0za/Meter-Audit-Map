@@ -365,17 +365,23 @@
 
         // Extract meter data from HTML description
         function extractMeterData(htmlString) {
+            console.log('Extracting data from HTML:', htmlString.substring(0, 500) + '...');
+            
             const parser = new DOMParser();
             const doc = parser.parseFromString(htmlString, 'text/html');
             
             const data = {};
             const rows = doc.querySelectorAll('tr');
             
-            rows.forEach(row => {
+            console.log('Found', rows.length, 'table rows');
+            
+            rows.forEach((row, index) => {
                 const cells = row.querySelectorAll('td');
                 if (cells.length === 2) {
                     const key = cells[0].textContent.trim();
                     const value = cells[1].textContent.trim();
+                    
+                    console.log(`Row ${index}: ${key} = ${value}`);
                     
                     switch(key) {
                         case 'PHYS_ADD':
@@ -385,6 +391,7 @@
                             data.meterNumber = value;
                             break;
                         case 'Loc_ID':
+                        case 'LOCID':
                             data.locId = value;
                             break;
                         case 'Meter_Type':
@@ -397,23 +404,40 @@
                             data.customer = value;
                             break;
                         case 'LINK':
+                            console.log('Processing LINK row...');
                             // Get the link element and extract href
                             const linkElement = cells[1].querySelector('a');
                             if (linkElement) {
                                 let href = linkElement.getAttribute('href');
+                                console.log('Found href attribute:', href);
                                 // Decode HTML entities
                                 if (href) {
                                     href = href.replace(/&amp;/g, '&');
                                     data.link = href;
+                                    console.log('Decoded href:', href);
                                 }
                             }
                             // Also try to extract from plain text if no link element found
                             if (!data.link) {
                                 let cellText = cells[1].textContent.trim();
+                                console.log('Trying to extract from cell text:', cellText);
                                 if (cellText.startsWith('https://form.fillout.com')) {
                                     // Decode HTML entities in the text
                                     cellText = cellText.replace(/&amp;/g, '&');
                                     data.link = cellText;
+                                    console.log('Extracted link from text:', cellText);
+                                }
+                            }
+                            // Also check innerHTML for the link
+                            if (!data.link) {
+                                const innerHTML = cells[1].innerHTML;
+                                console.log('Checking innerHTML:', innerHTML);
+                                const linkMatch = innerHTML.match(/href="([^"]*)/);
+                                if (linkMatch) {
+                                    let href = linkMatch[1];
+                                    href = href.replace(/&amp;/g, '&');
+                                    data.link = href;
+                                    console.log('Extracted link from innerHTML:', href);
                                 }
                             }
                             break;
@@ -421,8 +445,11 @@
                 }
             });
             
+            console.log('Extracted data so far:', data);
+            
             // If we still don't have a proper link, construct it from the data
             if (!data.link || !data.link.startsWith('https://form.fillout.com')) {
+                console.log('No valid link found, constructing from data...');
                 if (data.address && data.meterNumber && data.locId && data.meterType && data.meterStyle) {
                     // Construct the URL with proper encoding
                     const params = new URLSearchParams({
@@ -433,9 +460,19 @@
                         'Loc_ID': data.locId
                     });
                     data.link = `${FILLOUT_FORM_BASE_URL}?${params.toString()}`;
+                    console.log('Constructed link:', data.link);
+                } else {
+                    console.log('Missing required data for link construction:', {
+                        address: data.address,
+                        meterNumber: data.meterNumber,
+                        locId: data.locId,
+                        meterType: data.meterType,
+                        meterStyle: data.meterStyle
+                    });
                 }
             }
             
+            console.log('Final extracted data:', data);
             return data;
         }
 
