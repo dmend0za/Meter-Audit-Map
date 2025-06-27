@@ -346,7 +346,7 @@
                 <div class="popup-info">
                     <span class="popup-label">Customer:</span> ${meterData.customer || 'N/A'}
                 </div>
-                <a href="${meterData.link || '#'}" target="_blank" class="audit-button" onclick="markAsCompleted('${props.name}')">
+                <a href="${meterData.link || '#'}" target="_blank" rel="noopener noreferrer" class="audit-button" onclick="markAsCompleted('${props.name}'); return true;">
                     Start Audit
                 </a>
             `;
@@ -394,15 +394,47 @@
                             data.customer = value;
                             break;
                         case 'LINK':
+                            // Get the link element and extract href
                             const linkElement = cells[1].querySelector('a');
                             if (linkElement) {
-                                data.link = linkElement.href;
+                                let href = linkElement.getAttribute('href');
+                                // If href is relative or corrupted, try to get it from the text content
+                                if (!href || !href.startsWith('https://form.fillout.com')) {
+                                    const linkText = linkElement.textContent.trim();
+                                    if (linkText.startsWith('https://form.fillout.com')) {
+                                        href = linkText;
+                                    }
+                                }
+                                data.link = href;
+                            }
+                            // Also try to extract from plain text if no link element found
+                            if (!data.link) {
+                                const cellText = cells[1].textContent.trim();
+                                if (cellText.startsWith('https://form.fillout.com')) {
+                                    data.link = cellText;
+                                }
                             }
                             break;
                     }
                 }
             });
             
+            // If we still don't have a proper link, construct it from the data
+            if (!data.link || !data.link.startsWith('https://form.fillout.com')) {
+                if (data.address && data.meterNumber && data.locId && data.meterType && data.meterStyle) {
+                    // Construct the URL with proper encoding
+                    const params = new URLSearchParams({
+                        'Address': data.address,
+                        'Meter_Number': data.meterNumber,
+                        'Meter_Type': data.meterType,
+                        'Meter_Style': data.meterStyle,
+                        'Loc_ID': data.locId
+                    });
+                    data.link = `${FILLOUT_FORM_BASE_URL}?${params.toString()}`;
+                }
+            }
+            
+            console.log('Extracted meter data:', data);
             return data;
         }
 
