@@ -327,8 +327,20 @@
         function showMeterPopup(meter, coordinates) {
             const props = meter.properties;
             
+            console.log('Full meter properties:', props);
+            console.log('Description object:', props.description);
+            
             // Extract data from the HTML description
-            const meterData = extractMeterData(props.description.value);
+            let htmlString = '';
+            if (props.description && typeof props.description === 'object') {
+                htmlString = props.description.value || props.description;
+            } else if (typeof props.description === 'string') {
+                htmlString = props.description;
+            }
+            
+            console.log('HTML string to parse:', htmlString ? htmlString.substring(0, 200) + '...' : 'EMPTY');
+            
+            const meterData = extractMeterData(htmlString);
             
             console.log('Meter data for popup:', meterData);
             console.log('Audit link:', meterData.link);
@@ -388,7 +400,23 @@
 
         // Extract meter data from HTML description
         function extractMeterData(htmlString) {
-            console.log('Extracting data from HTML:', htmlString.substring(0, 500) + '...');
+            console.log('Extracting data from HTML. Type:', typeof htmlString, 'Length:', htmlString ? htmlString.length : 0);
+            
+            // Handle case where htmlString is undefined or empty
+            if (!htmlString || typeof htmlString !== 'string') {
+                console.log('No valid HTML string provided, returning empty data object');
+                return {
+                    address: '',
+                    meterNumber: '',
+                    locId: '',
+                    meterType: '',
+                    meterStyle: '',
+                    customer: '',
+                    link: ''
+                };
+            }
+            
+            console.log('HTML content preview:', htmlString.substring(0, 500) + '...');
             
             const parser = new DOMParser();
             const doc = parser.parseFromString(htmlString, 'text/html');
