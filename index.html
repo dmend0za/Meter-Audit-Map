@@ -340,7 +340,13 @@
             if (props.description && typeof props.description === 'object') {
                 htmlString = props.description.value || props.description;
             } else if (typeof props.description === 'string') {
-                htmlString = props.description;
+                // Check if it's a JSON string that needs parsing
+                try {
+                    const parsed = JSON.parse(props.description);
+                    htmlString = parsed.value || props.description;
+                } catch {
+                    htmlString = props.description;
+                }
             }
             
             console.log('HTML string to parse:', htmlString ? htmlString.substring(0, 200) + '...' : 'EMPTY');
@@ -376,7 +382,7 @@
                 <div class="popup-info">
                     <span class="popup-label">Customer:</span> ${meterData.customer || 'N/A'}
                 </div>
-                <button class="audit-button" onclick="startAuditSimple()">
+                <button class="audit-button" onclick="console.log('Button clicked!'); startAuditSimple();">
                     Start Audit
                 </button>
             `;
