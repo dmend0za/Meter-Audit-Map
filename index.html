@@ -201,17 +201,11 @@
                     style: 'mapbox://styles/mapbox/satellite-streets-v12',
                     center: [-78.095, 35.628], // Centered on the sample coordinates
                     zoom: 12,
-                    pitch: 60, // Add pitch for 3D effect
-                    bearing: 0, // Optional: rotate the map
                     attributionControl: true
                 });
 
                 map.on('load', function () {
                     document.getElementById('loading').style.display = 'none';
-                    
-                    // Add 3D buildings layer
-                    add3DBuildings();
-                    
                     loadMeterData();
                 });
 
