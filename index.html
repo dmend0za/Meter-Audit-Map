@@ -356,6 +356,8 @@
                 link: meterData.link
             };
             
+            console.log('Stored currentMeterData:', window.currentMeterData);
+            
             // Create popup content with simple inline onclick handler
             const popupContent = `
                 <div class="popup-header">${meterData.address || 'Unknown Address'}</div>
@@ -531,7 +533,11 @@
 
         // Simple audit function for inline onclick handler
         function startAuditSimple() {
+            console.log('startAuditSimple called');
+            console.log('window.currentMeterData:', window.currentMeterData);
+            
             if (!window.currentMeterData) {
+                console.log('No currentMeterData found');
                 showError('No meter data available');
                 return;
             }
@@ -542,7 +548,7 @@
             console.log('Starting audit for meter:', meterName);
             console.log('Audit link:', auditLink);
             
-            if (!auditLink || auditLink === 'undefined' || auditLink === 'null') {
+            if (!auditLink || auditLink === 'undefined' || auditLink === 'null' || auditLink === '') {
                 showError('Unable to generate audit link for this meter. Please check the meter data.');
                 return;
             }
@@ -560,8 +566,13 @@
             }
             
             // Simply open the link - no fallback, just one method
-            window.open(auditLink, '_blank');
-            console.log('Audit form opened');
+            try {
+                window.open(auditLink, '_blank');
+                console.log('Audit form opened successfully');
+            } catch (error) {
+                console.error('Error opening audit form:', error);
+                showError('Error opening audit form: ' + error.message);
+            }
         }
 
         // Check Google Sheets for completed audits
