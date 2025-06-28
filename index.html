@@ -128,11 +128,13 @@
         const FILLOUT_FORM_BASE_URL = 'https://form.fillout.com/t/aKNfdeajwuus';
         const GEOJSON_URL = 'https://raw.githubusercontent.com/dmend0za/Meter-Audit-Map/main/MetersInsp.geojson';
         const GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/15dpFfp3H33r5ycWW3hwysAPkQFLO4Sjc0JhXuzkv_Ek/edit?gid=0#gid=0';
+        const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/15dpFfp3H33r5ycWW3hwysAPkQFLO4Sjc0JhXuzkv_Ek/export?format=csv&gid=0';
         
         let map;
         let allMeters = [];
         let completedMeterIds = new Set();
         let currentPopup = null; // Store reference to current popup
+        let statusCheckInterval = null; // For periodic status checking
 
         // Initialize map
         function initializeMap() {
@@ -190,6 +192,9 @@
                 
                 addMarkersToMap();
                 updateStats();
+                
+                // Start periodic status checking
+                startStatusChecking();
                 
             } catch (error) {
                 console.error('Error loading meter data:', error);
@@ -540,7 +545,7 @@
             return data;
         }
 
-        // Start audit function - opens link and marks as completed
+        // Start audit function - opens link without marking as completed
         function startAudit(meterName, auditLink) {
             console.log('Starting audit for meter:', meterName);
             console.log('Audit link:', auditLink);
@@ -556,16 +561,13 @@
                 return;
             }
             
-            // Mark as completed first
-            markAsCompleted(meterName);
-            
             // Close popup
             if (currentPopup) {
                 currentPopup.remove();
                 currentPopup = null;
             }
             
-            // Open the audit form in a new tab/window
+            // Open the audit form in a new tab/window (do NOT mark as completed yet)
             try {
                 console.log('Attempting to open:', auditLink);
                 const newWindow = window.open(auditLink, '_blank', 'noopener,noreferrer');
@@ -582,30 +584,114 @@
                     tempLink.click();
                     document.body.removeChild(tempLink);
                 }
+                
+                // Show a message to the user
+                showInfo('Audit form opened. The marker will disappear after you submit the form.');
+                
             } catch (error) {
                 console.error('Error opening audit link:', error);
                 showError('Error opening audit form: ' + error.message);
             }
         }
 
-        // Mark meter as completed
-        function markAsCompleted(meterName) {
-            console.log('Marking meter as completed:', meterName);
-            completedMeterIds.add(meterName);
-            
-            // Store in localStorage
+        // Check Google Sheets for completed audits
+        async function checkCompletedAudits() {
             try {
-                localStorage.setItem('completedMeters', JSON.stringify([...completedMeterIds]));
-                console.log('Completed meters saved to localStorage');
+                console.log('Checking for completed audits...');
+                const response = await fetch(GOOGLE_SHEETS_CSV_URL);
+                
+                if (!response.ok) {
+                    console.log('Could not fetch spreadsheet data:', response.status);
+                    return;
+                }
+                
+                const csvData = await response.text();
+                const lines = csvData.split('\n');
+                
+                if (lines.length < 2) {
+                    console.log('No data found in spreadsheet');
+                    return;
+                }
+                
+                // Parse CSV headers
+                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                console.log('Spreadsheet headers:', headers);
+                
+                // Find the relevant column indices
+                const meterNumberIndex = headers.findIndex(h => 
+                    h.toLowerCase().includes('meter') && h.toLowerCase().includes('number')
+                );
+                const statusIndex = headers.findIndex(h => 
+                    h.toLowerCase().includes('status')
+                );
+                
+                console.log('Meter Number column index:', meterNumberIndex);
+                console.log('Status column index:', statusIndex);
+                
+                if (meterNumberIndex === -1 || statusIndex === -1) {
+                    console.log('Required columns not found in spreadsheet');
+                    return;
+                }
+                
+                let newCompletions = 0;
+                
+                // Check each row for completed status
+                for (let i = 1; i < lines.length; i++) {
+                    const row = lines[i].split(',').map(cell => cell.trim().replace(/"/g, ''));
+                    
+                    if (row.length > Math.max(meterNumberIndex, statusIndex)) {
+                        const meterNumber = row[meterNumberIndex];
+                        const status = row[statusIndex];
+                        
+                        if (meterNumber && status && status.toLowerCase() === 'complete') {
+                            if (!completedMeterIds.has(meterNumber)) {
+                                console.log('Found newly completed meter:', meterNumber);
+                                completedMeterIds.add(meterNumber);
+                                newCompletions++;
+                            }
+                        }
+                    }
+                }
+                
+                if (newCompletions > 0) {
+                    console.log(`Found ${newCompletions} newly completed audits`);
+                    // Save to localStorage
+                    localStorage.setItem('completedMeters', JSON.stringify([...completedMeterIds]));
+                    
+                    // Update map
+                    addMarkersToMap();
+                    updateStats();
+                    
+                    // Show notification
+                    showInfo(`${newCompletions} audit(s) completed! Markers updated.`);
+                }
+                
             } catch (error) {
-                console.error('Error saving to localStorage:', error);
+                console.error('Error checking completed audits:', error);
+            }
+        }
+
+        // Start periodic status checking
+        function startStatusChecking() {
+            // Check immediately
+            checkCompletedAudits();
+            
+            // Then check every 30 seconds
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
             }
             
-            // Update map immediately
-            setTimeout(() => {
-                addMarkersToMap();
-                updateStats();
-            }, 500);
+            statusCheckInterval = setInterval(() => {
+                checkCompletedAudits();
+            }, 30000); // Check every 30 seconds
+        }
+
+        // Stop status checking
+        function stopStatusChecking() {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
         }
 
         // Update statistics
