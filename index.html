@@ -583,7 +583,8 @@
                 console.log('Attempting to open:', auditLink);
                 const newWindow = window.open(auditLink, '_blank', 'noopener,noreferrer');
                 
-                if (!newWindow) {
+                // Check if window.open was successful
+                if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
                     // Popup blocker might have prevented opening
                     console.log('Popup blocked, trying alternative method...');
                     // Create a temporary link and click it
@@ -594,9 +595,9 @@
                     document.body.appendChild(tempLink);
                     tempLink.click();
                     document.body.removeChild(tempLink);
+                } else {
+                    console.log('Audit form opened successfully with window.open()');
                 }
-                
-                console.log('Audit form opened successfully');
                 
             } catch (error) {
                 console.error('Error opening audit link:', error);
