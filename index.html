@@ -356,13 +356,19 @@
             console.log('Meter data for popup:', meterData);
             console.log('Audit link:', meterData.link);
             
-            // Store the meter data globally so we can access it from the onclick handler
-            window.currentMeterData = {
+            // Store the meter data globally with a unique key to avoid conflicts
+            const dataKey = `meterData_${props.name}`;
+            window[dataKey] = {
                 name: props.name,
-                link: meterData.link
+                link: meterData.link,
+                timestamp: Date.now() // Add timestamp to track data freshness
             };
             
+            // Also store as current for backward compatibility
+            window.currentMeterData = window[dataKey];
+            
             console.log('Stored currentMeterData:', window.currentMeterData);
+            console.log('Stored with key:', dataKey, window[dataKey]);
             
             // Create popup content with simple inline onclick handler
             const popupContent = `
@@ -382,7 +388,7 @@
                 <div class="popup-info">
                     <span class="popup-label">Customer:</span> ${meterData.customer || 'N/A'}
                 </div>
-                <button class="audit-button" onclick="console.log('Button clicked!'); startAuditSimple();">
+                <button class="audit-button" onclick="console.log('Button clicked!'); startAuditWithId('${props.name}');">
                     Start Audit
                 </button>
             `;
@@ -401,10 +407,10 @@
             .setHTML(popupContent)
             .addTo(map);
 
-            // Clear reference when popup is closed
+            // Clear reference when popup is closed, but keep the stored data
             currentPopup.on('close', () => {
                 currentPopup = null;
-                window.currentMeterData = null;
+                // Don't clear window.currentMeterData here - let it persist
             });
         }
 
@@ -537,21 +543,38 @@
             return data;
         }
 
-        // Simple audit function for inline onclick handler
-        function startAuditSimple() {
-            console.log('startAuditSimple called');
-            console.log('window.currentMeterData:', window.currentMeterData);
+        // Enhanced audit function that can find data by meter ID
+        function startAuditWithId(meterId) {
+            console.log('startAuditWithId called with:', meterId);
             
-            if (!window.currentMeterData) {
-                console.log('No currentMeterData found');
-                showError('No meter data available');
+            // Try to get data by meter-specific key first
+            const dataKey = `meterData_${meterId}`;
+            let meterData = window[dataKey];
+            
+            // Fallback to currentMeterData if available
+            if (!meterData) {
+                meterData = window.currentMeterData;
+            }
+            
+            console.log('Found meter data:', meterData);
+            
+            if (!meterData) {
+                console.log('No meter data found for:', meterId);
+                showError('No meter data available. Please close and reopen the marker popup.');
                 return;
             }
             
-            const meterName = window.currentMeterData.name;
-            const auditLink = window.currentMeterData.link;
+            // Check if data is too old (older than 10 minutes)
+            const dataAge = Date.now() - (meterData.timestamp || 0);
+            if (dataAge > 600000) { // 10 minutes in milliseconds
+                console.log('Meter data is stale, age:', dataAge);
+                showError('Meter data is stale. Please close and reopen the marker popup.');
+                return;
+            }
             
-            console.log('Starting audit for meter:', meterName);
+            const auditLink = meterData.link;
+            
+            console.log('Starting audit for meter:', meterData.name);
             console.log('Audit link:', auditLink);
             
             if (!auditLink || auditLink === 'undefined' || auditLink === 'null' || auditLink === '') {
@@ -571,7 +594,7 @@
                 currentPopup = null;
             }
             
-            // Simply open the link - no fallback, just one method
+            // Simply open the link
             try {
                 window.open(auditLink, '_blank');
                 console.log('Audit form opened successfully');
@@ -579,6 +602,20 @@
                 console.error('Error opening audit form:', error);
                 showError('Error opening audit form: ' + error.message);
             }
+        }
+
+        // Keep the original function for backward compatibility
+        function startAuditSimple() {
+            console.log('startAuditSimple called (fallback)');
+            
+            if (!window.currentMeterData) {
+                console.log('No currentMeterData found');
+                showError('No meter data available. Please close and reopen the marker popup.');
+                return;
+            }
+            
+            // Use the enhanced function
+            startAuditWithId(window.currentMeterData.name);
         }
 
         // Check Google Sheets for completed audits
