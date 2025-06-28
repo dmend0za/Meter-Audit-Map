@@ -350,7 +350,13 @@
             console.log('Meter data for popup:', meterData);
             console.log('Audit link:', meterData.link);
             
-            // Create popup content without inline onclick handlers
+            // Store the meter data globally so we can access it from the onclick handler
+            window.currentMeterData = {
+                name: props.name,
+                link: meterData.link
+            };
+            
+            // Create popup content with simple inline onclick handler
             const popupContent = `
                 <div class="popup-header">${meterData.address || 'Unknown Address'}</div>
                 <div class="popup-info">
@@ -368,7 +374,7 @@
                 <div class="popup-info">
                     <span class="popup-label">Customer:</span> ${meterData.customer || 'N/A'}
                 </div>
-                <button class="audit-button" id="audit-btn-${props.name}">
+                <button class="audit-button" onclick="startAuditSimple()">
                     Start Audit
                 </button>
             `;
@@ -387,43 +393,10 @@
             .setHTML(popupContent)
             .addTo(map);
 
-            // Add event listener to the button after popup is added to DOM
-            // Use setTimeout to ensure DOM is fully rendered
-            setTimeout(() => {
-                const button = document.getElementById(`audit-btn-${props.name}`);
-                console.log('Looking for button with ID:', `audit-btn-${props.name}`);
-                console.log('Button found:', button);
-                
-                if (button) {
-                    console.log('Adding click event listener to button');
-                    
-                    // Remove any existing event listeners by cloning the button
-                    const newButton = button.cloneNode(true);
-                    button.parentNode.replaceChild(newButton, button);
-                    
-                    // Add single event listener to the clean button
-                    newButton.addEventListener('click', (e) => {
-                        console.log('Button clicked!');
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        // Disable button immediately to prevent multiple clicks
-                        newButton.disabled = true;
-                        newButton.textContent = 'Opening...';
-                        
-                        startAudit(props.name, meterData.link);
-                    }, { once: true }); // Use 'once' option to ensure it only fires once
-                    
-                    // Also add visual feedback on hover
-                    newButton.style.cursor = 'pointer';
-                } else {
-                    console.error('Button not found in DOM');
-                }
-            }, 100);
-
             // Clear reference when popup is closed
             currentPopup.on('close', () => {
                 currentPopup = null;
+                window.currentMeterData = null;
             });
         }
 
@@ -556,8 +529,16 @@
             return data;
         }
 
-        // Start audit function - opens link without marking as completed
-        function startAudit(meterName, auditLink) {
+        // Simple audit function for inline onclick handler
+        function startAuditSimple() {
+            if (!window.currentMeterData) {
+                showError('No meter data available');
+                return;
+            }
+            
+            const meterName = window.currentMeterData.name;
+            const auditLink = window.currentMeterData.link;
+            
             console.log('Starting audit for meter:', meterName);
             console.log('Audit link:', auditLink);
             
@@ -578,31 +559,9 @@
                 currentPopup = null;
             }
             
-            // Open the audit form in a new tab/window (do NOT mark as completed yet)
-            try {
-                console.log('Attempting to open:', auditLink);
-                const newWindow = window.open(auditLink, '_blank', 'noopener,noreferrer');
-                
-                // Check if window.open was successful
-                if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-                    // Popup blocker might have prevented opening
-                    console.log('Popup blocked, trying alternative method...');
-                    // Create a temporary link and click it
-                    const tempLink = document.createElement('a');
-                    tempLink.href = auditLink;
-                    tempLink.target = '_blank';
-                    tempLink.rel = 'noopener noreferrer';
-                    document.body.appendChild(tempLink);
-                    tempLink.click();
-                    document.body.removeChild(tempLink);
-                } else {
-                    console.log('Audit form opened successfully with window.open()');
-                }
-                
-            } catch (error) {
-                console.error('Error opening audit link:', error);
-                showError('Error opening audit form: ' + error.message);
-            }
+            // Simply open the link - no fallback, just one method
+            window.open(auditLink, '_blank');
+            console.log('Audit form opened');
         }
 
         // Check Google Sheets for completed audits
