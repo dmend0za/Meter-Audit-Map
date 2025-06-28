@@ -585,8 +585,10 @@
                     document.body.removeChild(tempLink);
                 }
                 
-                // Show a message to the user
-                showInfo('Audit form opened. The marker will disappear after you submit the form.');
+                // Show a message to the user (will be defined later in the code)
+                setTimeout(() => {
+                    showInfo('Audit form opened. The marker will disappear after you submit the form.');
+                }, 100);
                 
             } catch (error) {
                 console.error('Error opening audit link:', error);
@@ -633,7 +635,8 @@
                     return;
                 }
                 
-                let newCompletions = 0;
+                // Create a new set of currently completed meters from the spreadsheet
+                const currentlyCompleted = new Set();
                 
                 // Check each row for completed status
                 for (let i = 1; i < lines.length; i++) {
@@ -643,27 +646,46 @@
                         const meterNumber = row[meterNumberIndex];
                         const status = row[statusIndex];
                         
+                        console.log(`Row ${i}: Meter=${meterNumber}, Status=${status}`);
+                        
                         if (meterNumber && status && status.toLowerCase() === 'complete') {
-                            if (!completedMeterIds.has(meterNumber)) {
-                                console.log('Found newly completed meter:', meterNumber);
-                                completedMeterIds.add(meterNumber);
-                                newCompletions++;
-                            }
+                            currentlyCompleted.add(meterNumber);
                         }
                     }
                 }
                 
-                if (newCompletions > 0) {
-                    console.log(`Found ${newCompletions} newly completed audits`);
+                console.log('Currently completed meters from spreadsheet:', [...currentlyCompleted]);
+                console.log('Previously completed meters in memory:', [...completedMeterIds]);
+                
+                // Find newly completed meters
+                const newCompletions = [...currentlyCompleted].filter(meter => !completedMeterIds.has(meter));
+                
+                // Find meters that are no longer completed (status removed/changed)
+                const noLongerCompleted = [...completedMeterIds].filter(meter => !currentlyCompleted.has(meter));
+                
+                let mapNeedsUpdate = false;
+                
+                if (newCompletions.length > 0) {
+                    console.log('Found newly completed meters:', newCompletions);
+                    newCompletions.forEach(meter => completedMeterIds.add(meter));
+                    mapNeedsUpdate = true;
+                    showInfo(`${newCompletions.length} audit(s) completed! Markers removed.`);
+                }
+                
+                if (noLongerCompleted.length > 0) {
+                    console.log('Found meters no longer completed:', noLongerCompleted);
+                    noLongerCompleted.forEach(meter => completedMeterIds.delete(meter));
+                    mapNeedsUpdate = true;
+                    showInfo(`${noLongerCompleted.length} meter(s) status changed. Markers restored.`);
+                }
+                
+                if (mapNeedsUpdate) {
                     // Save to localStorage
                     localStorage.setItem('completedMeters', JSON.stringify([...completedMeterIds]));
                     
                     // Update map
                     addMarkersToMap();
                     updateStats();
-                    
-                    // Show notification
-                    showInfo(`${newCompletions} audit(s) completed! Markers updated.`);
                 }
                 
             } catch (error) {
@@ -708,6 +730,8 @@
         // Refresh data
         function refreshData() {
             document.getElementById('loading').style.display = 'block';
+            // Also check for completed audits when refreshing
+            checkCompletedAudits();
             loadMeterData();
         }
 
@@ -716,11 +740,26 @@
             const errorDiv = document.getElementById('error');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
+            errorDiv.style.backgroundColor = '#f8d7da';
+            errorDiv.style.color = '#721c24';
             document.getElementById('loading').style.display = 'none';
             
             setTimeout(() => {
                 errorDiv.style.display = 'none';
             }, 10000);
+        }
+
+        // Show info message
+        function showInfo(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            errorDiv.style.backgroundColor = '#d4edda';
+            errorDiv.style.color = '#155724';
+            
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
         }
 
         // Check if Mapbox GL JS loaded successfully
@@ -746,6 +785,11 @@
 
         window.addEventListener('offline', function() {
             showError('You are currently offline. Some features may not work properly.');
+        });
+
+        // Clean up intervals when page unloads
+        window.addEventListener('beforeunload', function() {
+            stopStatusChecking();
         });
     </script>
 </body>
