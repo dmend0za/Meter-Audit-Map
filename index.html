@@ -12,6 +12,61 @@
             padding: 0; 
             font-family: Arial, sans-serif;
         }
+
+        // Add 3D buildings to the map
+        function add3DBuildings() {
+            try {
+                // Check if the layer already exists
+                if (map.getLayer('3d-buildings')) {
+                    return;
+                }
+
+                // Add the 3D buildings layer
+                map.addLayer({
+                    'id': '3d-buildings',
+                    'source': 'composite',
+                    'source-layer': 'building',
+                    'filter': ['==', 'extrude', 'true'],
+                    'type': 'fill-extrusion',
+                    'minzoom': 15,
+                    'paint': {
+                        // Use building height data if available, otherwise default height
+                        'fill-extrusion-height': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            15, 0,
+                            15.05, ['get', 'height']
+                        ],
+                        // Building base height (usually ground level)
+                        'fill-extrusion-base': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            15, 0,
+                            15.05, ['get', 'min_height']
+                        ],
+                        // Building color with slight transparency
+                        'fill-extrusion-color': [
+                            'interpolate',
+                            ['linear'],
+                            ['get', 'height'],
+                            0, '#ffffff',
+                            50, '#ffd700',
+                            100, '#ff6b6b',
+                            200, '#4ecdc4'
+                        ],
+                        // Building opacity
+                        'fill-extrusion-opacity': 0.8
+                    }
+                });
+
+                console.log('3D buildings layer added successfully');
+                
+            } catch (error) {
+                console.error('Error adding 3D buildings layer:', error);
+            }
+        }
         #map { 
             position: absolute; 
             top: 0; 
@@ -146,11 +201,17 @@
                     style: 'mapbox://styles/mapbox/satellite-streets-v12',
                     center: [-78.095, 35.628], // Centered on the sample coordinates
                     zoom: 12,
+                    pitch: 60, // Add pitch for 3D effect
+                    bearing: 0, // Optional: rotate the map
                     attributionControl: true
                 });
 
                 map.on('load', function () {
                     document.getElementById('loading').style.display = 'none';
+                    
+                    // Add 3D buildings layer
+                    add3DBuildings();
+                    
                     loadMeterData();
                 });
 
