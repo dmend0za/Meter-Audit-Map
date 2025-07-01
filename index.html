@@ -569,6 +569,29 @@
                         'circle-stroke-color': '#fff'
                     }
                 });
+
+                // Add meter number labels that appear when zoomed in
+                map.addLayer({
+                    id: 'meter-labels',
+                    type: 'symbol',
+                    source: 'meters',
+                    filter: ['!', ['has', 'point_count']],
+                    layout: {
+                        'text-field': ['get', 'name'], // Use the meter name/number
+                        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                        'text-size': 12,
+                        'text-offset': [0, 2], // Position label below the marker
+                        'text-anchor': 'top',
+                        'text-allow-overlap': false, // Prevent overlapping labels
+                        'text-optional': true // Hide label if it would overlap
+                    },
+                    paint: {
+                        'text-color': '#333333',
+                        'text-halo-color': '#ffffff',
+                        'text-halo-width': 1
+                    },
+                    minzoom: 16 // Only show labels when zoomed in to level 16 or higher
+                });
             }
 
             // Add click handlers
