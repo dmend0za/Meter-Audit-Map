@@ -441,7 +441,7 @@
                     <span class="popup-label">Meter Style:</span> ${meterData.meterStyle || 'N/A'}
                 </div>
                 <div class="popup-info">
-                    <span class="popup-label">Customer:</span> ${meterData.customer || 'N/A'}
+                    <span class="popup-label">Volts:</span> ${meterData.volts || 'N/A'}
                 </div>
                 <button class="audit-button" onclick="console.log('Button clicked!'); startAuditWithId('${props.name}');">
                     Start Audit
@@ -482,7 +482,7 @@
                     locId: '',
                     meterType: '',
                     meterStyle: '',
-                    customer: '',
+                    volts: '',
                     link: ''
                 };
             }
@@ -522,8 +522,8 @@
                         case 'Meter_Styl':
                             data.meterStyle = value;
                             break;
-                        case 'Customer_N':
-                            data.customer = value;
+                        case 'volts':
+                            data.volts = value;
                             break;
                         case 'LINK':
                             console.log('Processing LINK row...');
@@ -573,7 +573,7 @@
             if (!data.link || !data.link.startsWith('https://form.fillout.com')) {
                 console.log('No valid link found, constructing from data...');
                 if (data.address && data.meterNumber && data.locId && data.meterType && data.meterStyle) {
-                    // Construct the URL with proper encoding
+                    // Construct the URL with proper encoding, now including volts
                     const params = new URLSearchParams({
                         'Address': data.address,
                         'Meter_Number': data.meterNumber,
@@ -581,6 +581,12 @@
                         'Meter_Style': data.meterStyle,
                         'Loc_ID': data.locId
                     });
+                    
+                    // Add volts if available
+                    if (data.volts) {
+                        params.append('volts', data.volts);
+                    }
+                    
                     data.link = `${FILLOUT_FORM_BASE_URL}?${params.toString()}`;
                     console.log('Constructed link:', data.link);
                 } else {
@@ -589,7 +595,8 @@
                         meterNumber: data.meterNumber,
                         locId: data.locId,
                         meterType: data.meterType,
-                        meterStyle: data.meterStyle
+                        meterStyle: data.meterStyle,
+                        volts: data.volts
                     });
                 }
             }
