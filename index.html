@@ -163,6 +163,56 @@
         .refresh-button:hover {
             background-color: #218838;
         }
+        
+        /* User location marker styles */
+        .user-location-marker {
+            position: relative;
+            width: 20px;
+            height: 20px;
+        }
+        
+        .user-location-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            background-color: #007cbf;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 2;
+        }
+        
+        .user-location-pulse {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background-color: #007cbf;
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: pulse 2s infinite;
+            z-index: 1;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.3;
+            }
+            70% {
+                transform: translate(-50%, -50%) scale(2);
+                opacity: 0;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -190,6 +240,8 @@
         let completedMeterIds = new Set();
         let currentPopup = null; // Store reference to current popup
         let statusCheckInterval = null; // For periodic status checking
+        let userLocationMarker = null; // Store user location marker
+        let watchId = null; // Store geolocation watch ID
 
         // Initialize map
         function initializeMap() {
@@ -207,6 +259,9 @@
                 map.on('load', function () {
                     document.getElementById('loading').style.display = 'none';
                     loadMeterData();
+                    
+                    // Request user location after map loads
+                    requestUserLocation();
                 });
 
                 map.on('error', function(e) {
@@ -216,6 +271,184 @@
             } catch (error) {
                 showError('Failed to initialize map: ' + error.message);
             }
+        }
+
+        // Request and track user location
+        function requestUserLocation() {
+            if (!navigator.geolocation) {
+                console.log('Geolocation is not supported by this browser');
+                showInfo('Location services not available on this device');
+                return;
+            }
+
+            console.log('Requesting user location...');
+            
+            // Get current position once
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    console.log('Got user location:', position.coords);
+                    updateUserLocationMarker(position.coords);
+                    
+                    // Start watching for location changes (useful when moving between sites)
+                    watchUserLocation();
+                },
+                (error) => {
+                    console.error('Error getting location:', error);
+                    handleLocationError(error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 60000 // Use cached location if less than 1 minute old
+                }
+            );
+        }
+
+        // Watch user location for continuous updates
+        function watchUserLocation() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    console.log('Location updated:', position.coords);
+                    updateUserLocationMarker(position.coords);
+                },
+                (error) => {
+                    console.error('Error watching location:', error);
+                },
+                {
+                    enableHighAccuracy: false, // Less battery intensive for watching
+                    timeout: 30000,
+                    maximumAge: 300000 // Use cached location if less than 5 minutes old
+                }
+            );
+        }
+
+        // Update or create user location marker
+        function updateUserLocationMarker(coords) {
+            const { latitude, longitude, accuracy } = coords;
+            
+            // Remove existing marker if it exists
+            if (userLocationMarker) {
+                userLocationMarker.remove();
+            }
+
+            // Create a pulsing blue dot for user location
+            const userLocationElement = document.createElement('div');
+            userLocationElement.className = 'user-location-marker';
+            userLocationElement.innerHTML = `
+                <div class="user-location-dot"></div>
+                <div class="user-location-pulse"></div>
+            `;
+
+            // Add the marker to the map
+            userLocationMarker = new mapboxgl.Marker({
+                element: userLocationElement,
+                anchor: 'center'
+            })
+            .setLngLat([longitude, latitude])
+            .addTo(map);
+
+            // Add accuracy circle if accuracy is reasonable (less than 100m)
+            if (accuracy < 100) {
+                addAccuracyCircle(longitude, latitude, accuracy);
+            }
+
+            console.log(`User location updated: ${latitude}, ${longitude} (±${accuracy}m)`);
+        }
+
+        // Add accuracy circle around user location
+        function addAccuracyCircle(lng, lat, accuracy) {
+            // Remove existing accuracy circle
+            if (map.getSource('user-accuracy')) {
+                map.removeLayer('user-accuracy-fill');
+                map.removeLayer('user-accuracy-stroke');
+                map.removeSource('user-accuracy');
+            }
+
+            // Create circle data
+            const radiusInKm = accuracy / 1000;
+            const options = { steps: 64, units: 'kilometers' };
+            
+            // We'll create a simple circle approximation
+            const center = [lng, lat];
+            const circle = {
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [generateCircleCoordinates(center, radiusInKm, 32)]
+                }
+            };
+
+            // Add source
+            map.addSource('user-accuracy', {
+                type: 'geojson',
+                data: circle
+            });
+
+            // Add fill layer
+            map.addLayer({
+                id: 'user-accuracy-fill',
+                type: 'fill',
+                source: 'user-accuracy',
+                paint: {
+                    'fill-color': '#007cbf',
+                    'fill-opacity': 0.1
+                }
+            });
+
+            // Add stroke layer
+            map.addLayer({
+                id: 'user-accuracy-stroke',
+                type: 'line',
+                source: 'user-accuracy',
+                paint: {
+                    'line-color': '#007cbf',
+                    'line-width': 1,
+                    'line-opacity': 0.3
+                }
+            });
+        }
+
+        // Generate circle coordinates
+        function generateCircleCoordinates(center, radiusKm, points) {
+            const coords = [];
+            const distanceX = radiusKm / (111.32 * Math.cos(center[1] * Math.PI / 180));
+            const distanceY = radiusKm / 110.54;
+
+            for (let i = 0; i < points; i++) {
+                const angle = (i / points) * 2 * Math.PI;
+                const x = center[0] + (distanceX * Math.cos(angle));
+                const y = center[1] + (distanceY * Math.sin(angle));
+                coords.push([x, y]);
+            }
+            coords.push(coords[0]); // Close the circle
+            return coords;
+        }
+
+        // Handle geolocation errors
+        function handleLocationError(error) {
+            let message = 'Location access failed: ';
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message += 'Permission denied. Please enable location access in your browser settings.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message += 'Location information unavailable.';
+                    break;
+                case error.TIMEOUT:
+                    message += 'Location request timed out.';
+                    break;
+                default:
+                    message += 'Unknown error occurred.';
+                    break;
+            }
+            
+            console.error(message);
+            showInfo(message);
         }
 
         // Load meter data from GeoJSON
@@ -874,6 +1107,11 @@
         // Clean up intervals when page unloads
         window.addEventListener('beforeunload', function() {
             stopStatusChecking();
+            
+            // Stop location watching
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
         });
     </script>
 </body>
