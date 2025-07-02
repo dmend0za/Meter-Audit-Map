@@ -586,7 +586,8 @@
                             ['==', ['get', 'meterStyle'], '6S'], '#eab308',   // Yellow
                             ['==', ['get', 'meterStyle'], '1S'], '#f97316',   // Orange
                             ['==', ['get', 'meterStyle'], '35S'], '#a16207',  // Brown
-                            '#000000' // Black for null/other values
+                            ['==', ['get', 'meterStyle'], '16S'], '#000000',  // Black
+                            '#ffffff' // Black for null/other values
                         ],
                         'circle-radius': 8,
                         'circle-stroke-width': 2,
