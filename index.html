@@ -492,16 +492,30 @@
 
         // Add markers to map
         function addMarkersToMap() {
-            // Filter out completed meters
+            // Filter out completed meters and add meter style to properties
             const pendingMeters = allMeters.filter(meter => 
                 !completedMeterIds.has(meter.properties.name)
-            );
+            ).map(meter => {
+                // Extract meter style from the description for color coding
+                const meterData = extractMeterData(meter.properties.description?.value || meter.properties.description || '');
+                
+                // Add meter style to the feature properties for Mapbox styling
+                return {
+                    ...meter,
+                    properties: {
+                        ...meter.properties,
+                        meterStyle: meterData.meterStyle || 'other'
+                    }
+                };
+            });
 
             // Create GeoJSON source
             const geojsonData = {
                 type: 'FeatureCollection',
                 features: pendingMeters
             };
+
+            console.log('Sample meter with style:', pendingMeters[0]?.properties);
 
             // Add source if it doesn't exist
             if (map.getSource('meters')) {
@@ -556,14 +570,24 @@
                     }
                 });
 
-                // Add individual meter points
+                // Add individual meter points with color coding based on meter style
                 map.addLayer({
                     id: 'unclustered-point',
                     type: 'circle',
                     source: 'meters',
                     filter: ['!', ['has', 'point_count']],
                     paint: {
-                        'circle-color': '#e74c3c',
+                        'circle-color': [
+                            'case',
+                            ['==', ['get', 'meterStyle'], '12S'], '#22c55e', // Green
+                            ['==', ['get', 'meterStyle'], '9S'], '#ef4444',   // Red
+                            ['==', ['get', 'meterStyle'], '4S'], '#7f00ff',   // Purple
+                            ['==', ['get', 'meterStyle'], '2S'], '#3b82f6',   // Blue
+                            ['==', ['get', 'meterStyle'], '6S'], '#eab308',   // Yellow
+                            ['==', ['get', 'meterStyle'], '1S'], '#f97316',   // Orange
+                            ['==', ['get', 'meterStyle'], '35S'], '#a16207',  // Brown
+                            '#000000' // Black for null/other values
+                        ],
                         'circle-radius': 8,
                         'circle-stroke-width': 2,
                         'circle-stroke-color': '#fff'
