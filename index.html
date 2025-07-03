@@ -231,7 +231,7 @@
         // Configuration
         const MAPBOX_TOKEN = 'pk.eyJ1IjoiZmllbGRzZW5zZSIsImEiOiJjbWMwb2ljY3YwNGFoMnJvaXN5c2xnMnR6In0.wc3C3TrsgsfyLf5ZJqHpnA';
         const FILLOUT_FORM_BASE_URL = 'https://form.fillout.com/t/aKNfdeajwuus';
-        const GEOJSON_URL = 'https://raw.githubusercontent.com/dmend0za/Meter-Audit-Map/main/MetersInsp.geojson';
+        const GEOJSON_URL = 'https://raw.githubusercontent.com/dmend0za/Meter-Audit-Map/main/MeterInsp.geojson';
         const GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/15dpFfp3H33r5ycWW3hwysAPkQFLO4Sjc0JhXuzkv_Ek/edit?gid=0#gid=0';
         const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/15dpFfp3H33r5ycWW3hwysAPkQFLO4Sjc0JhXuzkv_Ek/export?format=csv&gid=0';
         
@@ -579,9 +579,9 @@
                     paint: {
                         'circle-color': [
                             'case',
-                            ['==', ['get', 'meterStyle'], '12S'], '#22c55e', // Green
+                            ['==', ['get', 'meterStyle'], '12S'], '#006400', // Dark Green
                             ['==', ['get', 'meterStyle'], '9S'], '#ef4444',   // Red
-                            ['==', ['get', 'meterStyle'], '4S'], '#8b5cf6',   // Purple
+                            ['==', ['get', 'meterStyle'], '4S'], '#7f00ff',   // Purple
                             ['==', ['get', 'meterStyle'], '2S'], '#3b82f6',   // Blue
                             ['==', ['get', 'meterStyle'], '6S'], '#eab308',   // Yellow
                             ['==', ['get', 'meterStyle'], '1S'], '#f97316',   // Orange
