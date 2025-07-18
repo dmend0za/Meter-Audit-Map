@@ -1203,6 +1203,7 @@
                 
             } catch (error) {
                 console.error('Error checking completed audits:', error);
+                throw error; // Re-throw so refreshData can handle it
             }
         }
 
@@ -1242,10 +1243,18 @@
 
         // Refresh data
         function refreshData() {
+            console.log('Manual refresh triggered');
             document.getElementById('loading').style.display = 'block';
+            
             // Also check for completed audits when refreshing
-            checkCompletedAudits();
-            loadMeterData();
+            checkCompletedAudits().then(() => {
+                // After checking completed audits, reload meter data
+                loadMeterData();
+            }).catch((error) => {
+                console.error('Error during refresh:', error);
+                // Still try to load meter data even if audit check fails
+                loadMeterData();
+            });
         }
 
         // Show error message
