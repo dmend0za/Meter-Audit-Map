@@ -276,6 +276,16 @@
             background-color: #ddd;
             margin: 8px 0;
         }
+        
+        /* Completed notice styling */
+        .completed-notice {
+            text-align: center;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
     </style>
 </head>
 <body>
@@ -744,12 +754,27 @@
                             ['==', ['get', 'meterStyle'], '16S'], '#ffffff', // White outline for black marker
                             ['in', ['get', 'meterStyle'], ['literal', ['12S', '9S', '4S', '2S', '6S', '1S', '35S']]], '#ffffff', // White outline for colored markers
                             '#333333' // Dark outline for white "Other" markers
-                        ],
-                        'circle-opacity': [
-                            'case',
-                            ['all', ['get', 'isKeyAccount'], ['get', 'isCompleted']], 0.4, // 40% opacity for completed Key Accounts
-                            1.0 // Full opacity for all others
                         ]
+                    }
+                });
+
+                // Add red X overlay for completed Key Account meters
+                map.addLayer({
+                    id: 'completed-key-account-x',
+                    type: 'symbol',
+                    source: 'meters',
+                    filter: ['all', ['!', ['has', 'point_count']], ['get', 'isKeyAccount'], ['get', 'isCompleted']],
+                    layout: {
+                        'text-field': '✕',
+                        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                        'text-size': 14,
+                        'text-anchor': 'center',
+                        'text-allow-overlap': true
+                    },
+                    paint: {
+                        'text-color': '#ff0000',
+                        'text-halo-color': '#ffffff',
+                        'text-halo-width': 1
                     }
                 });
 
