@@ -1244,16 +1244,27 @@
         // Refresh data
         function refreshData() {
             console.log('Manual refresh triggered');
-            document.getElementById('loading').style.display = 'block';
+            const loadingElement = document.getElementById('loading');
+            loadingElement.style.display = 'block';
+            
+            // Flag that we're refreshing to prevent loadMeterData from hiding loading
+            window.isRefreshing = true;
             
             // Also check for completed audits when refreshing
             checkCompletedAudits().then(() => {
                 // After checking completed audits, reload meter data
-                loadMeterData();
+                return loadMeterData();
+            }).then(() => {
+                // Ensure loading is hidden after everything completes
+                window.isRefreshing = false;
+                loadingElement.style.display = 'none';
+                console.log('Refresh completed successfully');
             }).catch((error) => {
                 console.error('Error during refresh:', error);
-                // Still try to load meter data even if audit check fails
-                loadMeterData();
+                // Always hide loading even if there's an error
+                window.isRefreshing = false;
+                loadingElement.style.display = 'none';
+                showError('Error refreshing data: ' + error.message);
             });
         }
 
