@@ -262,6 +262,20 @@
             color: #333;
             font-size: 13px;
         }
+        
+        /* Special styling for Key Account legend item */
+        .special-item {
+            background-color: rgba(201, 210, 218, 0.2);
+            padding: 4px 6px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .legend-divider {
+            height: 1px;
+            background-color: #ddd;
+            margin: 8px 0;
+        }
     </style>
 </head>
 <body>
@@ -522,6 +536,11 @@
             legend.className = 'meter-legend';
             legend.innerHTML = `
                 <div class="legend-title">Meter Styles</div>
+                <div class="legend-item special-item">
+                    <div class="legend-color" style="background-color: #c9d2da; border-color: #ffffff;"></div>
+                    <span><strong>Key Account</strong></span>
+                </div>
+                <div class="legend-divider"></div>
                 <div class="legend-item">
                     <div class="legend-color" style="background-color: #f97316; border-color: #ffffff;"></div>
                     <span>1S</span>
@@ -607,19 +626,27 @@
 
         // Add markers to map
         function addMarkersToMap() {
-            // Filter out completed meters and add meter style to properties
-            const pendingMeters = allMeters.filter(meter => 
-                !completedMeterIds.has(meter.properties.name)
-            ).map(meter => {
-                // Extract meter style from the description for color coding
+            // Filter out completed meters but keep Key Account meters regardless of completion status
+            const pendingMeters = allMeters.filter(meter => {
                 const meterData = extractMeterData(meter.properties.description?.value || meter.properties.description || '');
+                const isKeyAccount = meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL';
                 
-                // Add meter style to the feature properties for Mapbox styling
+                // Keep Key Account meters always, filter out completed non-Key Account meters
+                return isKeyAccount || !completedMeterIds.has(meter.properties.name);
+            }).map(meter => {
+                // Extract meter style and key account info for styling
+                const meterData = extractMeterData(meter.properties.description?.value || meter.properties.description || '');
+                const isKeyAccount = meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL';
+                const isCompleted = completedMeterIds.has(meter.properties.name);
+                
+                // Add properties for styling
                 return {
                     ...meter,
                     properties: {
                         ...meter.properties,
-                        meterStyle: meterData.meterStyle || 'other'
+                        meterStyle: meterData.meterStyle || 'other',
+                        isKeyAccount: isKeyAccount,
+                        isCompleted: isCompleted
                     }
                 };
             });
@@ -630,7 +657,7 @@
                 features: pendingMeters
             };
 
-            console.log('Sample meter with style:', pendingMeters[0]?.properties);
+            console.log('Sample meter with styling properties:', pendingMeters[0]?.properties);
 
             // Add source if it doesn't exist
             if (map.getSource('meters')) {
@@ -685,7 +712,7 @@
                     }
                 });
 
-                // Add individual meter points with color coding based on meter style
+                // Add individual meter points with special Key Account handling
                 map.addLayer({
                     id: 'unclustered-point',
                     type: 'circle',
@@ -694,6 +721,7 @@
                     paint: {
                         'circle-color': [
                             'case',
+                            ['get', 'isKeyAccount'], '#c9d2da', // Gray-blue for Key Account meters
                             ['==', ['get', 'meterStyle'], '12S'], '#006400', // Dark Green
                             ['==', ['get', 'meterStyle'], '9S'], '#ef4444',   // Red
                             ['==', ['get', 'meterStyle'], '4S'], '#7f00ff',   // Purple
@@ -704,13 +732,23 @@
                             ['==', ['get', 'meterStyle'], '16S'], '#000000',  // Black
                             '#ffffff' // White for other/unknown values
                         ],
-                        'circle-radius': 8,
+                        'circle-radius': [
+                            'case',
+                            ['get', 'isKeyAccount'], 10, // Slightly larger for Key Accounts
+                            8 // Regular size for others
+                        ],
                         'circle-stroke-width': 2,
                         'circle-stroke-color': [
                             'case',
+                            ['get', 'isKeyAccount'], '#ffffff', // White outline for Key Account
                             ['==', ['get', 'meterStyle'], '16S'], '#ffffff', // White outline for black marker
                             ['in', ['get', 'meterStyle'], ['literal', ['12S', '9S', '4S', '2S', '6S', '1S', '35S']]], '#ffffff', // White outline for colored markers
                             '#333333' // Dark outline for white "Other" markers
+                        ],
+                        'circle-opacity': [
+                            'case',
+                            ['all', ['get', 'isKeyAccount'], ['get', 'isCompleted']], 0.4, // 40% opacity for completed Key Accounts
+                            1.0 // Full opacity for all others
                         ]
                     }
                 });
