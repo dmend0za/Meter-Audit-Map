@@ -1289,8 +1289,75 @@
                     return;
                 }
                 
-                // Create a new set of currently completed meters from the spreadsheet
-                const currentlyCompleted = new Set();
+                // Parse CSV properly handling quoted fields with commas
+                function parseCSVLine(line) {
+                    const result = [];
+                    let current = '';
+                    let inQuotes = false;
+                    let i = 0;
+                    
+                    while (i < line.length) {
+                        const char = line[i];
+                        const nextChar = line[i + 1];
+                        
+                        if (char === '"') {
+                            if (inQuotes && nextChar === '"') {
+                                // Escaped quote
+                                current += '"';
+                                i += 2;
+                            } else {
+                                // Toggle quote state
+                                inQuotes = !inQuotes;
+                                i++;
+                            }
+                        } else if (char === ',' && !inQuotes) {
+                            // Field separator
+                            result.push(current.trim());
+                            current = '';
+                            i++;
+                        } else {
+                            current += char;
+                            i++;
+                        }
+                    }
+                    
+                    // Add the last field
+                    result.push(current.trim());
+                    return result;
+                }
+                
+                // Check each row for completed status
+                for (let i = 1; i < lines.length; i++) {
+                    const rawLine = lines[i];
+                    if (!rawLine.trim()) continue; // Skip empty lines
+                    
+                    const row = parseCSVLine(rawLine);
+                    
+                    if (row.length > Math.max(finalMeterIndex, finalStatusIndex)) {
+                        const meterNumber = row[finalMeterIndex]?.trim().replace(/"/g, '') || '';
+                        let status = row[finalStatusIndex]?.trim().replace(/"/g, '') || '';
+                        
+                        // Fallback: check adjacent columns for status if primary is empty
+                        if (!status || status.length === 0) {
+                            // Check one column to the right
+                            if (finalStatusIndex + 1 < row.length && row[finalStatusIndex + 1]) {
+                                status = row[finalStatusIndex + 1].trim().replace(/"/g, '');
+                            }
+                            // Check one column to the left  
+                            else if (finalStatusIndex - 1 >= 0 && row[finalStatusIndex - 1]) {
+                                status = row[finalStatusIndex - 1].trim().replace(/"/g, '');
+                            }
+                        }
+                        
+                        if (meterNumber && meterNumber.length > 0) {
+                            if (status && status.length > 0) {
+                                if (status.toLowerCase() === 'complete') {
+                                    currentlyCompleted.add(meterNumber);
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 // Check each row for completed status
                 for (let i = 1; i < lines.length; i++) {
