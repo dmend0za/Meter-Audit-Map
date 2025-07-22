@@ -1,4 +1,835 @@
-// Extract meter data from HTML description
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meter Audit Map</title>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            background-color: #f5f5f5;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .control-button {
+            background: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .control-button:hover {
+            background: #f8f9fa;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            transform: translateY(-1px);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 200px;
+            font-size: 12px;
+        }
+
+        .legend-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .legend-title {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 2px solid;
+            flex-shrink: 0;
+        }
+
+        .legend-item span {
+            color: #333;
+            font-size: 13px;
+        }
+        
+        /* Special styling for Key Account legend item */
+        .special-item {
+            background-color: rgba(201, 210, 218, 0.2);
+            padding: 4px 6px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .legend-divider {
+            height: 1px;
+            background-color: #ddd;
+            margin: 8px 0;
+        }
+        
+        /* Completed notice styling */
+        .completed-notice {
+            text-align: center;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
+
+        .stats {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 15px;
+        }
+
+        .stat-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            min-width: 80px;
+        }
+
+        .stat-number {
+            display: block;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 2000;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        /* Popup styles */
+        .mapboxgl-popup-content {
+            padding: 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        .popup-header {
+            background: #2563eb;
+            color: white;
+            padding: 12px 15px;
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .popup-info {
+            padding: 8px 15px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+        }
+
+        .popup-info:last-child {
+            border-bottom: none;
+        }
+
+        .popup-label {
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .audit-button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 10px 15px 15px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            width: calc(100% - 30px);
+            transition: background 0.2s ease;
+        }
+
+        .audit-button:hover {
+            background: #059669;
+        }
+
+        /* Info message styles */
+        .info-message {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1500;
+            font-weight: 500;
+            max-width: 300px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .error-message {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: #ef4444;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1500;
+            font-weight: 500;
+            max-width: 300px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .controls {
+                top: 10px;
+                right: 10px;
+                gap: 8px;
+            }
+
+            .control-button {
+                padding: 10px 12px;
+                font-size: 12px;
+            }
+
+            .stats {
+                top: 10px;
+                left: 10px;
+                gap: 10px;
+            }
+
+            .stat-item {
+                padding: 10px;
+                min-width: 60px;
+            }
+
+            .stat-number {
+                font-size: 18px;
+            }
+
+            .stat-label {
+                font-size: 11px;
+            }
+
+            .legend {
+                bottom: 10px;
+                right: 10px;
+                padding: 12px;
+                max-width: 160px;
+                font-size: 11px;
+            }
+
+            .legend-title {
+                font-size: 12px;
+            }
+
+            .legend-item span {
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="controls" role="navigation" aria-label="Map controls">
+        <button class="control-button" onclick="refreshData()" aria-label="Refresh map data">🔄 Refresh Data</button>
+        <button class="control-button" onclick="locateUser()" aria-label="Center map on your location">📍 My Location</button>
+    </nav>
+
+    <section class="stats" role="region" aria-label="Meter statistics">
+        <div class="stat-item">
+            <span class="stat-number" id="total-meters">0</span>
+            <span class="stat-label">Total Meters</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-number" id="pending-meters">0</span>
+            <span class="stat-label">Pending Audits</span>
+        </div>
+    </section>
+
+    <aside class="legend" role="complementary" aria-label="Map legend">
+        <!-- Legend will be populated by JavaScript -->
+    </aside>
+
+    <main id="map" role="main" aria-label="Interactive meter location map"></main>
+
+    <div id="loading">Loading meter locations...</div>
+
+    <script>
+        // Configuration
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZG1lbmRvemEiLCJhIjoiY20ycGMzcjB6MDUzMDJyczRrNnZicGNheiJ9.jzl3oIjm1-MXakmN5cPy7w';
+        const GEOJSON_URL = 'https://dmend0za.github.io/Meter-Audit-Map/MeterInsp.geojson';
+        const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1wFGrinSXWHRYplgOLgD3tjx4-c0lv4JXncshfBhoBwc/export?format=csv&gid=0';
+
+        // Global variables
+        let map;
+        let allMeters = [];
+        let completedMeterIds = new Set();
+        let userLocation = null;
+        let statusCheckInterval = null;
+
+        // Initialize map
+        function initMap() {
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/satellite-v9',
+                center: [-78.0, 35.8], // North Carolina
+                zoom: 10
+            });
+
+            map.on('load', () => {
+                setupMapLayers();
+                loadMeterData();
+                setupUserLocation();
+                createLegend();
+            });
+
+            // Add navigation controls
+            map.addControl(new mapboxgl.NavigationControl(), 'top-left');
+        }
+
+        // Setup map layers and clustering
+        function setupMapLayers() {
+            // Add source for meter data
+            map.addSource('meters', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: []
+                },
+                cluster: true,
+                clusterMaxZoom: 14,
+                clusterRadius: 50
+            });
+
+            // Add cluster circles
+            map.addLayer({
+                id: 'clusters',
+                type: 'circle',
+                source: 'meters',
+                filter: ['has', 'point_count'],
+                paint: {
+                    'circle-color': [
+                        'step',
+                        ['get', 'point_count'],
+                        '#51bbd6',
+                        100,
+                        '#f1f075',
+                        750,
+                        '#f28cb1'
+                    ],
+                    'circle-radius': [
+                        'step',
+                        ['get', 'point_count'],
+                        20,
+                        100,
+                        30,
+                        750,
+                        40
+                    ]
+                }
+            });
+
+            // Add cluster count labels
+            map.addLayer({
+                id: 'cluster-count',
+                type: 'symbol',
+                source: 'meters',
+                filter: ['has', 'point_count'],
+                layout: {
+                    'text-field': '{point_count_abbreviated}',
+                    'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                    'text-size': 12
+                }
+            });
+
+            // Add individual meter points with special Key Account handling
+            map.addLayer({
+                id: 'unclustered-point',
+                type: 'circle',
+                source: 'meters',
+                filter: ['!', ['has', 'point_count']],
+                paint: {
+                    'circle-color': [
+                        'case',
+                        ['get', 'isKeyAccount'], '#c9d2da', // Gray-blue for Key Account meters
+                        ['==', ['get', 'meterStyle'], '12S'], '#006400', // Dark Green
+                        ['==', ['get', 'meterStyle'], '9S'], '#ef4444',   // Red
+                        ['==', ['get', 'meterStyle'], '4S'], '#7f00ff',   // Purple
+                        ['==', ['get', 'meterStyle'], '2S'], '#3b82f6',   // Blue
+                        ['==', ['get', 'meterStyle'], '6S'], '#eab308',   // Yellow
+                        ['==', ['get', 'meterStyle'], '1S'], '#f97316',   // Orange
+                        ['==', ['get', 'meterStyle'], '35S'], '#a16207',  // Brown
+                        ['==', ['get', 'meterStyle'], '16S'], '#000000',  // Black
+                        '#ffffff' // White for other/unknown values
+                    ],
+                    'circle-radius': [
+                        'case',
+                        ['get', 'isKeyAccount'], 10, // Slightly larger for Key Accounts
+                        8 // Regular size for others
+                    ],
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': [
+                        'case',
+                        ['get', 'isKeyAccount'], '#000000', // Black outline for Key Account
+                        ['==', ['get', 'meterStyle'], '16S'], '#ffffff', // White outline for black marker
+                        ['in', ['get', 'meterStyle'], ['literal', ['12S', '9S', '4S', '2S', '6S', '1S', '35S']]], '#ffffff', // White outline for colored markers
+                        '#333333' // Dark outline for white "Other" markers
+                    ]
+                }
+            });
+
+            // Add red X overlay for completed Key Account meters
+            map.addLayer({
+                id: 'completed-key-account-x',
+                type: 'symbol',
+                source: 'meters',
+                filter: ['all', ['!', ['has', 'point_count']], ['get', 'isKeyAccount'], ['get', 'isCompleted']],
+                layout: {
+                    'text-field': '✕',
+                    'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                    'text-size': 20, // Increased from 14 to 20 for better visibility
+                    'text-anchor': 'center',
+                    'text-allow-overlap': true
+                },
+                paint: {
+                    'text-color': '#ff0000',
+                    'text-halo-color': '#ffffff',
+                    'text-halo-width': 2 // Increased halo width for better contrast
+                }
+            });
+
+            // Add meter labels
+            map.addLayer({
+                id: 'meter-labels',
+                type: 'symbol',
+                source: 'meters',
+                filter: ['!', ['has', 'point_count']],
+                layout: {
+                    'text-field': ['get', 'name'],
+                    'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                    'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+                    'text-radial-offset': 0.8,
+                    'text-justify': 'auto',
+                    'text-size': 10
+                },
+                paint: {
+                    'text-color': '#333',
+                    'text-halo-color': '#ffffff',
+                    'text-halo-width': 1
+                }
+            });
+
+            // Setup click handlers
+            map.on('click', 'clusters', (e) => {
+                const features = map.queryRenderedFeatures(e.point, {
+                    layers: ['clusters']
+                });
+                const clusterId = features[0].properties.cluster_id;
+                map.getSource('meters').getClusterExpansionZoom(clusterId, (err, zoom) => {
+                    if (err) return;
+                    map.easeTo({
+                        center: features[0].geometry.coordinates,
+                        zoom: zoom
+                    });
+                });
+            });
+
+            map.on('click', 'unclustered-point', (e) => {
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const meter = e.features[0];
+                
+                // Ensure that if the map is zoomed out such that multiple
+                // copies of the feature are visible, the popup appears
+                // over the copy being pointed to.
+                while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                    coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                }
+
+                showMeterPopup(meter, coordinates);
+            });
+
+            // Change cursor on hover
+            map.on('mouseenter', 'clusters', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', 'clusters', () => {
+                map.getCanvas().style.cursor = '';
+            });
+            map.on('mouseenter', 'unclustered-point', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', 'unclustered-point', () => {
+                map.getCanvas().style.cursor = '';
+            });
+        }
+
+        // Setup user location tracking
+        function setupUserLocation() {
+            if (!navigator.geolocation) {
+                return;
+            }
+
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000
+            };
+
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    userLocation = {
+                        lng: position.coords.longitude,
+                        lat: position.coords.latitude,
+                        accuracy: position.coords.accuracy
+                    };
+                    
+                    updateUserLocationMarker();
+                },
+                (error) => {
+                    console.error('Error watching location:', error);
+                },
+                options
+            );
+        }
+
+        // Update user location marker on map
+        function updateUserLocationMarker() {
+            if (!userLocation || !map.loaded()) return;
+
+            // Remove existing user location layers if they exist
+            if (map.getLayer('user-location')) {
+                map.removeLayer('user-location');
+            }
+            if (map.getLayer('user-location-accuracy')) {
+                map.removeLayer('user-location-accuracy');
+            }
+            if (map.getSource('user-location')) {
+                map.removeSource('user-location');
+            }
+
+            // Add user location source
+            map.addSource('user-location', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: [
+                        {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Point',
+                                coordinates: [userLocation.lng, userLocation.lat]
+                            },
+                            properties: {
+                                accuracy: userLocation.accuracy
+                            }
+                        }
+                    ]
+                }
+            });
+
+            // Add accuracy circle
+            map.addLayer({
+                id: 'user-location-accuracy',
+                type: 'circle',
+                source: 'user-location',
+                paint: {
+                    'circle-radius': {
+                        stops: [
+                            [0, 0],
+                            [20, Math.max(userLocation.accuracy, 10)]
+                        ],
+                        base: 2
+                    },
+                    'circle-color': '#007cbf',
+                    'circle-opacity': 0.2,
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#007cbf',
+                    'circle-stroke-opacity': 0.5
+                }
+            });
+
+            // Add user location dot
+            map.addLayer({
+                id: 'user-location',
+                type: 'circle',
+                source: 'user-location',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': '#007cbf',
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+        }
+
+        // Center map on user location
+        function locateUser() {
+            if (!userLocation) {
+                showError('Location not available. Please enable location services.');
+                return;
+            }
+
+            map.flyTo({
+                center: [userLocation.lng, userLocation.lat],
+                zoom: 16,
+                duration: 2000
+            });
+
+            showInfo(`Centered on your location (±${Math.round(userLocation.accuracy)}m)`);
+        }
+
+        // Load meter data from GeoJSON
+        async function loadMeterData() {
+            try {
+                const response = await fetch(GEOJSON_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}. Please ensure MeterInsp.geojson file exists in your GitHub repository.`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.features || !Array.isArray(data.features)) {
+                    throw new Error('Invalid GeoJSON format: features array not found');
+                }
+                
+                allMeters = data.features;
+                
+                // Check completed meters from localStorage
+                const stored = localStorage.getItem('completedMeters');
+                if (stored) {
+                    completedMeterIds = new Set(JSON.parse(stored));
+                }
+                
+                addMarkersToMap();
+                updateStats();
+                
+                // Start periodic status checking only on initial load (not on refresh)
+                if (!statusCheckInterval) {
+                    startStatusChecking();
+                }
+                
+                // Only hide loading if this is NOT a refresh (initial load only)
+                if (!window.isRefreshing) {
+                    document.getElementById('loading').style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error loading meter data:', error);
+                showError('Failed to load meter data: ' + error.message + '\n\nPlease ensure the MeterInsp.geojson file exists in your GitHub repository.');
+                
+                // Always hide loading on error
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Add markers to map
+        function addMarkersToMap() {
+            // Filter out completed meters but keep Key Account meters regardless of completion status
+            const pendingMeters = allMeters.filter(meter => {
+                const meterData = extractMeterData(meter.properties.description?.value || meter.properties.description || '');
+                const isKeyAccount = meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL';
+                
+                // Keep Key Account meters always, filter out completed non-Key Account meters
+                return isKeyAccount || !completedMeterIds.has(meter.properties.name);
+            }).map(meter => {
+                // Extract meter style and key account info for styling
+                const meterData = extractMeterData(meter.properties.description?.value || meter.properties.description || '');
+                const isKeyAccount = meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL';
+                const isCompleted = completedMeterIds.has(meter.properties.name);
+                
+                // Add properties for styling
+                return {
+                    ...meter,
+                    properties: {
+                        ...meter.properties,
+                        meterStyle: meterData.meterStyle || 'other',
+                        isKeyAccount: isKeyAccount,
+                        isCompleted: isCompleted
+                    }
+                };
+            });
+
+            // Create GeoJSON source
+            const geojsonData = {
+                type: 'FeatureCollection',
+                features: pendingMeters
+            };
+
+            // Update the map source
+            map.getSource('meters').setData(geojsonData);
+        }
+
+        // Show meter popup with details
+        function showMeterPopup(meter, coordinates) {
+            const props = meter.properties;
+            
+            // Extract data from the HTML description
+            let htmlString = '';
+            if (props.description && typeof props.description === 'object') {
+                htmlString = props.description.value || props.description;
+            } else if (typeof props.description === 'string') {
+                // Check if it's a JSON string that needs parsing
+                try {
+                    const parsed = JSON.parse(props.description);
+                    htmlString = parsed.value || props.description;
+                } catch {
+                    htmlString = props.description;
+                }
+            }
+            
+            const meterData = extractMeterData(htmlString);
+
+            // Store the meter data globally with a unique key to avoid conflicts
+            const dataKey = `meterData_${props.name}`;
+            window[dataKey] = {
+                name: props.name,
+                link: meterData.link,
+                timestamp: Date.now() // Add timestamp to track data freshness
+            };
+            
+            // Also store as current for backward compatibility
+            window.currentMeterData = window[dataKey];
+
+            // Check completion status in real-time when creating popup
+            const realTimeCompleted = completedMeterIds.has(props.name);
+            
+            // Create popup content - remove Start Audit button for completed meters
+            const popupContent = `
+                <div class="popup-header">${meterData.address || 'Unknown Address'}</div>
+                <div class="popup-info">
+                    <span class="popup-label">Meter Number:</span> ${meterData.meterNumber || 'N/A'}
+                </div>
+                <div class="popup-info">
+                    <span class="popup-label">Location ID:</span> ${meterData.locId || 'N/A'}
+                </div>
+                <div class="popup-info">
+                    <span class="popup-label">Meter Type:</span> ${meterData.meterType || 'N/A'}
+                </div>
+                <div class="popup-info">
+                    <span class="popup-label">Meter Style:</span> ${meterData.meterStyle || 'N/A'}
+                </div>
+                <div class="popup-info">
+                    <span class="popup-label">Volts:</span> ${meterData.volts || 'N/A'}
+                </div>
+                <div class="popup-info">
+                    <span class="popup-label">Location Status:</span> ${meterData.locationStatus || 'N/A'}
+                </div>
+                ${(meterData.billingMultiplier && meterData.billingMultiplier !== '1' && meterData.billingMultiplier.toUpperCase() !== 'NULL') ? 
+                    `<div class="popup-info">
+                        <span class="popup-label">Billing Multiplier:</span> ${meterData.billingMultiplier}
+                    </div>` : ''
+                }
+                ${(meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL') ? 
+                    `<div class="popup-info">
+                        <span class="popup-label">Key Account:</span> ${meterData.keyAccount}
+                    </div>` : ''
+                }
+                ${realTimeCompleted ? 
+                    `<div class="completed-notice">
+                        <span style="color: #28a745; font-weight: bold;">✓ Audit Completed</span>
+                    </div>` : 
+                    `<button class="audit-button" onclick="startAuditWithId('${props.name}');">
+                        Start Audit
+                    </button>`
+                }
+            `;
+
+            // Create popup and add to map
+            const popup = new mapboxgl.Popup({
+                closeOnClick: true,
+                closeButton: true,
+                maxWidth: '300px'
+            })
+                .setLngLat(coordinates)
+                .setHTML(popupContent)
+                .addTo(map);
+        }
+
+        // Extract meter data from HTML description
         function extractMeterData(htmlString) {
             const data = {};
             
@@ -23,7 +854,13 @@
                         // Check if the cell contains a link
                         const link = valueCell.querySelector('a');
                         if (key === 'LINK' && link) {
-                            data.link = link.href;
+                            // Get the href attribute
+                            const href = link.getAttribute('href');
+                            
+                            // Decode HTML entities
+                            const decodedHref = href.replace(/&amp;/g, '&');
+                            
+                            data.link = decodedHref;
                         } else {
                             const value = valueCell.textContent.trim();
                             
@@ -58,552 +895,44 @@
                                     data.keyAccount = value;
                                     break;
                             }
-                        }<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meter Audit Map</title>
-    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
-    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
-            font-family: Arial, sans-serif;
-        }
-
-        // Add 3D buildings to the map
-        function add3DBuildings() {
-            try {
-                // Check if the layer already exists
-                if (map.getLayer('3d-buildings')) {
-                    return;
-                }
-
-                // Add the 3D buildings layer
-                map.addLayer({
-                    'id': '3d-buildings',
-                    'source': 'composite',
-                    'source-layer': 'building',
-                    'filter': ['==', 'extrude', 'true'],
-                    'type': 'fill-extrusion',
-                    'minzoom': 15,
-                    'paint': {
-                        // Use building height data if available, otherwise default height
-                        'fill-extrusion-height': [
-                            'interpolate',
-                            ['linear'],
-                            ['zoom'],
-                            15, 0,
-                            15.05, ['get', 'height']
-                        ],
-                        // Building base height (usually ground level)
-                        'fill-extrusion-base': [
-                            'interpolate',
-                            ['linear'],
-                            ['zoom'],
-                            15, 0,
-                            15.05, ['get', 'min_height']
-                        ],
-                        // Building color with slight transparency
-                        'fill-extrusion-color': [
-                            'interpolate',
-                            ['linear'],
-                            ['get', 'height'],
-                            0, '#ffffff',
-                            50, '#ffd700',
-                            100, '#ff6b6b',
-                            200, '#4ecdc4'
-                        ],
-                        // Building opacity
-                        'fill-extrusion-opacity': 0.8
+                        }
                     }
                 });
-
-                console.log('3D buildings layer added successfully');
                 
             } catch (error) {
-                console.error('Error adding 3D buildings layer:', error);
+                console.error('Error parsing meter data:', error);
             }
-        }
-        #map { 
-            position: absolute; 
-            top: 0; 
-            bottom: 0; 
-            width: 100%; 
-        }
-        .mapboxgl-popup-content {
-            padding: 15px;
-            max-width: 300px;
-        }
-        .popup-header {
-            font-weight: bold;
-            font-size: 16px;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        .popup-info {
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-        .popup-label {
-            font-weight: bold;
-            color: #666;
-        }
-        .audit-button {
-            background-color: #007cbf;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            width: 100%;
-            margin-top: 10px;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-        }
-        .audit-button:hover {
-            background-color: #005a87;
-        }
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .error {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 5px;
-            border: 1px solid #f5c6cb;
-            z-index: 1000;
-        }
-        .stats {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            font-size: 14px;
-            z-index: 1000;
-        }
-        .stats-title {
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #333;
-        }
-        .refresh-button {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            z-index: 1000;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        .refresh-button:hover {
-            background-color: #218838;
-        }
-        
-        /* User location marker styles */
-        .user-location-marker {
-            position: relative;
-            width: 20px;
-            height: 20px;
-        }
-        
-        .user-location-dot {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 12px;
-            height: 12px;
-            background-color: #007cbf;
-            border: 2px solid #ffffff;
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            z-index: 2;
-        }
-        
-        .user-location-pulse {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
-            background-color: #007cbf;
-            border-radius: 50%;
-            opacity: 0.3;
-            animation: pulse 2s infinite;
-            z-index: 1;
-        }
-        
-        @keyframes pulse {
-            0% {
-                transform: translate(-50%, -50%) scale(1);
-                opacity: 0.3;
-            }
-            70% {
-                transform: translate(-50%, -50%) scale(2);
-                opacity: 0;
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(2);
-                opacity: 0;
-            }
-        }
-        
-        /* Meter style legend styles */
-        .meter-legend {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            font-size: 13px;
-            z-index: 1000;
-            min-width: 120px;
-        }
-        
-        .legend-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #333;
-            font-size: 14px;
-            text-align: center;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 8px;
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 6px;
-            font-weight: 500;
-        }
-        
-        .legend-item:last-child {
-            margin-bottom: 0;
-        }
-        
-        .legend-color {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            border: 2px solid #fff;
-            margin-right: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-        
-        .legend-item span {
-            color: #333;
-            font-size: 13px;
-        }
-        
-        /* Special styling for Key Account legend item */
-        .special-item {
-            background-color: rgba(201, 210, 218, 0.2);
-            padding: 4px 6px;
-            border-radius: 4px;
-            margin-bottom: 8px;
-        }
-        
-        .legend-divider {
-            height: 1px;
-            background-color: #ddd;
-            margin: 8px 0;
-        }
-        
-        /* Completed notice styling */
-        .completed-notice {
-            text-align: center;
-            padding: 10px;
-            margin-top: 10px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-        }
-    </style>
-</head>
-<body>
-            <main id="map" role="main" aria-label="Interactive meter location map"></main>
-    <div id="loading" class="loading">Loading meter locations...</div>
-    <div id="error" class="error" style="display: none;"></div>
-    <div id="stats" class="stats">
-        <div class="stats-title">Audit Progress</div>
-        <div id="total-meters">Total Meters: 0</div>
-        <div id="pending-meters">Pending: 0</div>
-        <div id="completed-meters">Completed: 0</div>
-    </div>
-    <button id="refresh-button" class="refresh-button" onclick="refreshData()">Refresh Data</button>
-
-    <script>
-        // Configuration
-        const MAPBOX_TOKEN = 'pk.eyJ1IjoiZmllbGRzZW5zZSIsImEiOiJjbWMwb2ljY3YwNGFoMnJvaXN5c2xnMnR6In0.wc3C3TrsgsfyLf5ZJqHpnA';
-        const FILLOUT_FORM_BASE_URL = 'https://form.fillout.com/t/aKNfdeajwuus';
-        const GEOJSON_URL = 'https://raw.githubusercontent.com/dmend0za/Meter-Audit-Map/main/MeterInsp.geojson';
-        const GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/15dpFfp3H33r5ycWW3hwysAPkQFLO4Sjc0JhXuzkv_Ek/edit?gid=0#gid=0';
-        const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1wFGrinSXWHRYplgOLgD3tjx4-c0lv4JXncshfBhoBwc/export?format=csv&gid=0';
-        
-        let map;
-        let allMeters = [];
-        let completedMeterIds = new Set();
-        let currentPopup = null; // Store reference to current popup
-        let statusCheckInterval = null; // For periodic status checking
-        let userLocationMarker = null; // Store user location marker
-        let watchId = null; // Store geolocation watch ID
-
-        // Initialize map
-        function initializeMap() {
-            try {
-                mapboxgl.accessToken = MAPBOX_TOKEN;
-                
-                map = new mapboxgl.Map({
-                    container: 'map',
-                    style: 'mapbox://styles/mapbox/satellite-streets-v12',
-                    center: [-78.095, 35.628], // Centered on the sample coordinates
-                    zoom: 12,
-                    attributionControl: true
-                });
-
-                map.on('load', function () {
-                    document.getElementById('loading').style.display = 'none';
-                    loadMeterData();
-                    
-                    // Request user location after map loads
-                    requestUserLocation();
-                    
-                    // Add meter style legend after map loads
-                    addMeterStyleLegend();
-                });
-
-                map.on('error', function(e) {
-                    showError('Map failed to load: ' + e.error.message);
-                });
-
-            } catch (error) {
-                showError('Failed to initialize map: ' + error.message);
-            }
+            
+            return data;
         }
 
-        // Request and track user location
-        function requestUserLocation() {
-            if (!navigator.geolocation) {
-                console.log('Geolocation is not supported by this browser');
-                showInfo('Location services not available on this device');
+        // Start audit with meter ID
+        function startAuditWithId(meterId) {
+            const dataKey = `meterData_${meterId}`;
+            const meterData = window[dataKey] || window.currentMeterData;
+            
+            if (!meterData || !meterData.link) {
+                showError('Audit link not available for this meter.');
                 return;
             }
-
-            console.log('Requesting user location...');
             
-            // Get current position once
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    console.log('Got user location:', position.coords);
-                    updateUserLocationMarker(position.coords);
-                    
-                    // Start watching for location changes (useful when moving between sites)
-                    watchUserLocation();
-                },
-                (error) => {
-                    console.error('Error getting location:', error);
-                    handleLocationError(error);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 60000 // Use cached location if less than 1 minute old
-                }
-            );
+            // Open the audit form in a new tab
+            window.open(meterData.link, '_blank');
         }
 
-        // Watch user location for continuous updates
-        function watchUserLocation() {
-            if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
-            }
-
-            watchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    console.log('Location updated:', position.coords);
-                    updateUserLocationMarker(position.coords);
-                },
-                (error) => {
-                    console.error('Error watching location:', error);
-                },
-                {
-                    enableHighAccuracy: false, // Less battery intensive for watching
-                    timeout: 30000,
-                    maximumAge: 300000 // Use cached location if less than 5 minutes old
-                }
-            );
-        }
-
-        // Update or create user location marker
-        function updateUserLocationMarker(coords) {
-            const { latitude, longitude, accuracy } = coords;
+        // Update statistics
+        function updateStats() {
+            const totalMeters = allMeters.length;
+            const completedCount = completedMeterIds.size;
+            const pendingCount = totalMeters - completedCount;
             
-            // Remove existing marker if it exists
-            if (userLocationMarker) {
-                userLocationMarker.remove();
-            }
-
-            // Create a pulsing blue dot for user location
-            const userLocationElement = document.createElement('div');
-            userLocationElement.className = 'user-location-marker';
-            userLocationElement.innerHTML = `
-                <div class="user-location-dot"></div>
-                <div class="user-location-pulse"></div>
-            `;
-
-            // Add the marker to the map
-            userLocationMarker = new mapboxgl.Marker({
-                element: userLocationElement,
-                anchor: 'center'
-            })
-            .setLngLat([longitude, latitude])
-            .addTo(map);
-
-            // Auto-zoom to user location on first load
-            if (!map.hasUserCentered) {
-                map.flyTo({
-                    center: [longitude, latitude],
-                    zoom: 16, // Good zoom level to see nearby meters
-                    duration: 2000 // 2 second smooth animation
-                });
-                map.hasUserCentered = true; // Flag to prevent repeated centering
-                console.log('Auto-centered map on user location');
-            }
-
-            // Add accuracy circle if accuracy is reasonable (less than 100m)
-            if (accuracy < 100) {
-                addAccuracyCircle(longitude, latitude, accuracy);
-            }
-
-            console.log(`User location updated: ${latitude}, ${longitude} (±${accuracy}m)`);
+            document.getElementById('total-meters').textContent = totalMeters;
+            document.getElementById('pending-meters').textContent = pendingCount;
         }
 
-        // Add accuracy circle around user location
-        function addAccuracyCircle(lng, lat, accuracy) {
-            // Remove existing accuracy circle
-            if (map.getSource('user-accuracy')) {
-                map.removeLayer('user-accuracy-fill');
-                map.removeLayer('user-accuracy-stroke');
-                map.removeSource('user-accuracy');
-            }
-
-            // Create circle data
-            const radiusInKm = accuracy / 1000;
-            const options = { steps: 64, units: 'kilometers' };
-            
-            // We'll create a simple circle approximation
-            const center = [lng, lat];
-            const circle = {
-                type: 'Feature',
-                geometry: {
-                    type: 'Polygon',
-                    coordinates: [generateCircleCoordinates(center, radiusInKm, 32)]
-                }
-            };
-
-            // Add source
-            map.addSource('user-accuracy', {
-                type: 'geojson',
-                data: circle
-            });
-
-            // Add fill layer
-            map.addLayer({
-                id: 'user-accuracy-fill',
-                type: 'fill',
-                source: 'user-accuracy',
-                paint: {
-                    'fill-color': '#007cbf',
-                    'fill-opacity': 0.1
-                }
-            });
-
-            // Add stroke layer
-            map.addLayer({
-                id: 'user-accuracy-stroke',
-                type: 'line',
-                source: 'user-accuracy',
-                paint: {
-                    'line-color': '#007cbf',
-                    'line-width': 1,
-                    'line-opacity': 0.3
-                }
-            });
-        }
-
-        // Generate circle coordinates
-        function generateCircleCoordinates(center, radiusKm, points) {
-            const coords = [];
-            const distanceX = radiusKm / (111.32 * Math.cos(center[1] * Math.PI / 180));
-            const distanceY = radiusKm / 110.54;
-
-            for (let i = 0; i < points; i++) {
-                const angle = (i / points) * 2 * Math.PI;
-                const x = center[0] + (distanceX * Math.cos(angle));
-                const y = center[1] + (distanceY * Math.sin(angle));
-                coords.push([x, y]);
-            }
-            coords.push(coords[0]); // Close the circle
-            return coords;
-        }
-
-        // Handle geolocation errors
-        function handleLocationError(error) {
-            let message = 'Location access failed: ';
-            
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    message += 'Permission denied. Please enable location access in your browser settings.';
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    message += 'Location information unavailable.';
-                    break;
-                case error.TIMEOUT:
-                    message += 'Location request timed out.';
-                    break;
-                default:
-                    message += 'Unknown error occurred.';
-                    break;
-            }
-            
-            console.error(message);
-            showInfo(message);
-        }
-
-        // Add meter style legend to the map
-        function addMeterStyleLegend() {
-            // Create legend container
-            const legend = document.createElement('div');
-            legend.id = 'meter-legend';
-            legend.className = 'meter-legend';
+        // Create legend
+        function createLegend() {
+            const legend = document.querySelector('.legend');
             legend.innerHTML = `
                 <h3 class="legend-title">Meter Styles</h3>
                 <ul class="legend-list" role="list">
@@ -652,613 +981,26 @@
                     </li>
                 </ul>
             `;
-            
-            // Add legend to map container
-            document.getElementById('map').appendChild(legend);
-            
-            console.log('Meter style legend added');
-        }
-
-        // Load meter data from GeoJSON
-        async function loadMeterData() {
-            try {
-                console.log('Attempting to load data from:', GEOJSON_URL);
-                const response = await fetch(GEOJSON_URL);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}. Please ensure MetersInsp.geojson file exists in your GitHub repository.`);
-                }
-                
-                const data = await response.json();
-                console.log('Data loaded successfully:', data);
-                
-                if (!data.features || !Array.isArray(data.features)) {
-                    throw new Error('Invalid GeoJSON format: features array not found');
-                }
-                
-                allMeters = data.features;
-                console.log(`Loaded ${allMeters.length} meters`);
-                
-                // Check completed meters from localStorage
-                const stored = localStorage.getItem('completedMeters');
-                if (stored) {
-                    completedMeterIds = new Set(JSON.parse(stored));
-                    console.log(`Found ${completedMeterIds.size} completed meters in local storage`);
-                }
-                
-                addMarkersToMap();
-                updateStats();
-                
-                // Start periodic status checking
-                startStatusChecking();
-                
-            } catch (error) {
-                console.error('Error loading meter data:', error);
-                showError('Failed to load meter data: ' + error.message + '\n\nPlease ensure the MetersInsp.geojson file exists in your GitHub repository.');
-            }
-        }
-
-        // Add markers to map
-        function addMarkersToMap() {
-            // Filter out completed meters but keep Key Account meters regardless of completion status
-            const pendingMeters = allMeters.filter(meter => {
-                const meterData = extractMeterData(meter.properties.description?.value || meter.properties.description || '');
-                const isKeyAccount = meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL';
-                
-                // Keep Key Account meters always, filter out completed non-Key Account meters
-                return isKeyAccount || !completedMeterIds.has(meter.properties.name);
-            }).map(meter => {
-                // Extract meter style and key account info for styling
-                const meterData = extractMeterData(meter.properties.description?.value || meter.properties.description || '');
-                const isKeyAccount = meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL';
-                const isCompleted = completedMeterIds.has(meter.properties.name);
-                
-                // Add properties for styling
-                return {
-                    ...meter,
-                    properties: {
-                        ...meter.properties,
-                        meterStyle: meterData.meterStyle || 'other',
-                        isKeyAccount: isKeyAccount,
-                        isCompleted: isCompleted
-                    }
-                };
-            });
-
-            // Create GeoJSON source
-            const geojsonData = {
-                type: 'FeatureCollection',
-                features: pendingMeters
-            };
-
-            // Add source if it doesn't exist
-            if (map.getSource('meters')) {
-                map.getSource('meters').setData(geojsonData);
-            } else {
-                map.addSource('meters', {
-                    type: 'geojson',
-                    data: geojsonData,
-                    cluster: true,
-                    clusterMaxZoom: 14,
-                    clusterRadius: 50
-                });
-
-                // Add cluster circles
-                map.addLayer({
-                    id: 'clusters',
-                    type: 'circle',
-                    source: 'meters',
-                    filter: ['has', 'point_count'],
-                    paint: {
-                        'circle-color': [
-                            'step',
-                            ['get', 'point_count'],
-                            '#51bbd6',
-                            100,
-                            '#f1c40f',
-                            750,
-                            '#f28cb1'
-                        ],
-                        'circle-radius': [
-                            'step',
-                            ['get', 'point_count'],
-                            20,
-                            100,
-                            30,
-                            750,
-                            40
-                        ]
-                    }
-                });
-
-                // Add cluster count labels
-                map.addLayer({
-                    id: 'cluster-count',
-                    type: 'symbol',
-                    source: 'meters',
-                    filter: ['has', 'point_count'],
-                    layout: {
-                        'text-field': '{point_count_abbreviated}',
-                        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-                        'text-size': 12
-                    }
-                });
-
-                // Add individual meter points with special Key Account handling
-                map.addLayer({
-                    id: 'unclustered-point',
-                    type: 'circle',
-                    source: 'meters',
-                    filter: ['!', ['has', 'point_count']],
-                    paint: {
-                        'circle-color': [
-                            'case',
-                            ['get', 'isKeyAccount'], '#c9d2da', // Gray-blue for Key Account meters
-                            ['==', ['get', 'meterStyle'], '12S'], '#006400', // Dark Green
-                            ['==', ['get', 'meterStyle'], '9S'], '#ef4444',   // Red
-                            ['==', ['get', 'meterStyle'], '4S'], '#7f00ff',   // Purple
-                            ['==', ['get', 'meterStyle'], '2S'], '#3b82f6',   // Blue
-                            ['==', ['get', 'meterStyle'], '6S'], '#eab308',   // Yellow
-                            ['==', ['get', 'meterStyle'], '1S'], '#f97316',   // Orange
-                            ['==', ['get', 'meterStyle'], '35S'], '#a16207',  // Brown
-                            ['==', ['get', 'meterStyle'], '16S'], '#000000',  // Black
-                            '#ffffff' // White for other/unknown values
-                        ],
-                        'circle-radius': [
-                            'case',
-                            ['get', 'isKeyAccount'], 10, // Slightly larger for Key Accounts
-                            8 // Regular size for others
-                        ],
-                        'circle-stroke-width': 2,
-                        'circle-stroke-color': [
-                            'case',
-                            ['get', 'isKeyAccount'], '#000000', // Black outline for Key Account
-                            ['==', ['get', 'meterStyle'], '16S'], '#ffffff', // White outline for black marker
-                            ['in', ['get', 'meterStyle'], ['literal', ['12S', '9S', '4S', '2S', '6S', '1S', '35S']]], '#ffffff', // White outline for colored markers
-                            '#333333' // Dark outline for white "Other" markers
-                        ]
-                    }
-                });
-
-                // Add red X overlay for completed Key Account meters
-                map.addLayer({
-                    id: 'completed-key-account-x',
-                    type: 'symbol',
-                    source: 'meters',
-                    filter: ['all', ['!', ['has', 'point_count']], ['get', 'isKeyAccount'], ['get', 'isCompleted']],
-                    layout: {
-                        'text-field': '✕',
-                        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-                        'text-size': 20, // Increased from 14 to 20 for better visibility
-                        'text-anchor': 'center',
-                        'text-allow-overlap': true
-                    },
-                    paint: {
-                        'text-color': '#ff0000',
-                        'text-halo-color': '#ffffff',
-                        'text-halo-width': 2 // Increased halo width for better contrast
-                    }
-                });
-
-                // Add meter number labels that appear when zoomed in
-                map.addLayer({
-                    id: 'meter-labels',
-                    type: 'symbol',
-                    source: 'meters',
-                    filter: ['!', ['has', 'point_count']],
-                    layout: {
-                        'text-field': ['get', 'name'], // Use the meter name/number
-                        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-                        'text-size': 16, // Increased from 12 to 16
-                        'text-offset': [0, 2.2], // Slightly more offset for bigger text
-                        'text-anchor': 'top',
-                        'text-allow-overlap': false, // Prevent overlapping labels
-                        'text-optional': true // Hide label if it would overlap
-                    },
-                    paint: {
-                        'text-color': '#1a1a1a', // Darker text for better contrast
-                        'text-halo-color': '#ffffff',
-                        'text-halo-width': 2 // Thicker white halo for better readability
-                    },
-                    minzoom: 16 // Only show labels when zoomed in to level 16 or higher
-                });
-            }
-
-            // Add click handlers
-            setupClickHandlers();
-        }
-
-        // Setup click handlers
-        function setupClickHandlers() {
-            // Click on clusters to zoom
-            map.on('click', 'clusters', (e) => {
-                const features = map.queryRenderedFeatures(e.point, {
-                    layers: ['clusters']
-                });
-                const clusterId = features[0].properties.cluster_id;
-                map.getSource('meters').getClusterExpansionZoom(
-                    clusterId,
-                    (err, zoom) => {
-                        if (err) return;
-                        map.easeTo({
-                            center: features[0].geometry.coordinates,
-                            zoom: zoom
-                        });
-                    }
-                );
-            });
-
-            // Click on individual meters to show popup
-            map.on('click', 'unclustered-point', (e) => {
-                const meter = e.features[0];
-                showMeterPopup(meter, e.lngLat);
-            });
-
-            // Change cursor on hover
-            map.on('mouseenter', 'clusters', () => {
-                map.getCanvas().style.cursor = 'pointer';
-            });
-            map.on('mouseleave', 'clusters', () => {
-                map.getCanvas().style.cursor = '';
-            });
-            map.on('mouseenter', 'unclustered-point', () => {
-                map.getCanvas().style.cursor = 'pointer';
-            });
-            map.on('mouseleave', 'unclustered-point', () => {
-                map.getCanvas().style.cursor = '';
-            });
-        }
-
-        // Show meter popup with details
-        function showMeterPopup(meter, coordinates) {
-            const props = meter.properties;
-            
-            console.log('Full meter properties:', props);
-            console.log('Description object:', props.description);
-            
-            // Extract data from the HTML description
-            let htmlString = '';
-            if (props.description && typeof props.description === 'object') {
-                htmlString = props.description.value || props.description;
-            } else if (typeof props.description === 'string') {
-                // Check if it's a JSON string that needs parsing
-                try {
-                    const parsed = JSON.parse(props.description);
-                    htmlString = parsed.value || props.description;
-                } catch {
-                    htmlString = props.description;
-                }
-            }
-            
-            console.log('HTML string to parse:', htmlString ? htmlString.substring(0, 200) + '...' : 'EMPTY');
-            
-            const meterData = extractMeterData(htmlString);
-            
-            console.log('Meter data for popup:', meterData);
-            console.log('Audit link:', meterData.link);
-            
-            // Store the meter data globally with a unique key to avoid conflicts
-            const dataKey = `meterData_${props.name}`;
-            window[dataKey] = {
-                name: props.name,
-                link: meterData.link,
-                timestamp: Date.now() // Add timestamp to track data freshness
-            };
-            
-            // Also store as current for backward compatibility
-            window.currentMeterData = window[dataKey];
-            
-            console.log('Stored currentMeterData:', window.currentMeterData);
-            console.log('Stored with key:', dataKey, window[dataKey]);
-            
-            // Create popup content with simple inline onclick handler
-            const popupContent = `
-                <div class="popup-header">${meterData.address || 'Unknown Address'}</div>
-                <div class="popup-info">
-                    <span class="popup-label">Meter Number:</span> ${meterData.meterNumber || 'N/A'}
-                </div>
-                <div class="popup-info">
-                    <span class="popup-label">Location ID:</span> ${meterData.locId || 'N/A'}
-                </div>
-                <div class="popup-info">
-                    <span class="popup-label">Meter Type:</span> ${meterData.meterType || 'N/A'}
-                </div>
-                <div class="popup-info">
-                    <span class="popup-label">Meter Style:</span> ${meterData.meterStyle || 'N/A'}
-                </div>
-                <div class="popup-info">
-                    <span class="popup-label">Volts:</span> ${meterData.volts || 'N/A'}
-                </div>
-                <div class="popup-info">
-                    <span class="popup-label">Location Status:</span> ${meterData.locationStatus || 'N/A'}
-                </div>
-                ${(meterData.billingMultiplier && meterData.billingMultiplier !== '1' && meterData.billingMultiplier.toUpperCase() !== 'NULL') ? 
-                    `<div class="popup-info">
-                        <span class="popup-label">Billing Multiplier:</span> ${meterData.billingMultiplier}
-                    </div>` : ''
-                }
-                ${(meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL') ? 
-                    `<div class="popup-info">
-                        <span class="popup-label">Key Account:</span> ${meterData.keyAccount}
-                    </div>` : ''
-                }
-                <button class="audit-button" onclick="console.log('Button clicked!'); startAuditWithId('${props.name}');">
-                    Start Audit
-                </button>
-            `;
-
-            // Close any existing popup
-            if (currentPopup) {
-                currentPopup.remove();
-            }
-
-            // Create new popup
-            currentPopup = new mapboxgl.Popup({
-                closeOnClick: true,
-                closeButton: true
-            })
-            .setLngLat(coordinates)
-            .setHTML(popupContent)
-            .addTo(map);
-
-            // Clear reference when popup is closed, but keep the stored data
-            currentPopup.on('close', () => {
-                currentPopup = null;
-                // Don't clear window.currentMeterData here - let it persist
-            });
-        }
-
-        // Extract meter data from HTML description
-        function extractMeterData(htmlString) {
-            console.log('Extracting data from HTML. Type:', typeof htmlString, 'Length:', htmlString ? htmlString.length : 0);
-            
-            // Handle case where htmlString is undefined or empty
-            if (!htmlString || typeof htmlString !== 'string') {
-                console.log('No valid HTML string provided, returning empty data object');
-                return {
-                    address: '',
-                    meterNumber: '',
-                    locId: '',
-                    meterType: '',
-                    meterStyle: '',
-                    volts: '',
-                    locationStatus: '',
-                    billingMultiplier: '',
-                    keyAccount: '',
-                    link: ''
-                };
-            }
-            
-            console.log('HTML content preview:', htmlString.substring(0, 500) + '...');
-            
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(htmlString, 'text/html');
-            
-            const data = {};
-            const rows = doc.querySelectorAll('tr');
-            
-            console.log('Found', rows.length, 'table rows');
-            
-            rows.forEach((row, index) => {
-                const cells = row.querySelectorAll('td');
-                if (cells.length === 2) {
-                    const key = cells[0].textContent.trim();
-                    const value = cells[1].textContent.trim();
-                    
-                    console.log(`Row ${index}: ${key} = ${value}`);
-                    
-                    switch(key) {
-                        case 'PHYS_ADD':
-                            data.address = value;
-                            break;
-                        case 'Meter_Numb':
-                            data.meterNumber = value;
-                            break;
-                        case 'Loc_ID':
-                        case 'LOCID':
-                            data.locId = value;
-                            break;
-                        case 'Meter_Type':
-                            data.meterType = value;
-                            break;
-                        case 'Meter_Styl':
-                            data.meterStyle = value;
-                            break;
-                        case 'volts':
-                            data.volts = value;
-                            break;
-                        case 'location_s':
-                            data.locationStatus = value;
-                            break;
-                        case 'Billing_Mu':
-                            data.billingMultiplier = value;
-                            break;
-                        case 'Key_Accoun':
-                            data.keyAccount = value;
-                            break;
-                        case 'LINK':
-                            console.log('Processing LINK row...');
-                            // Get the link element and extract href
-                            const linkElement = cells[1].querySelector('a');
-                            if (linkElement) {
-                                let href = linkElement.getAttribute('href');
-                                console.log('Found href attribute:', href);
-                                // Decode HTML entities
-                                if (href) {
-                                    href = href.replace(/&amp;/g, '&');
-                                    data.link = href;
-                                    console.log('Decoded href:', href);
-                                }
-                            }
-                            // Also try to extract from plain text if no link element found
-                            if (!data.link) {
-                                let cellText = cells[1].textContent.trim();
-                                console.log('Trying to extract from cell text:', cellText);
-                                if (cellText.startsWith('https://form.fillout.com')) {
-                                    // Decode HTML entities in the text
-                                    cellText = cellText.replace(/&amp;/g, '&');
-                                    data.link = cellText;
-                                    console.log('Extracted link from text:', cellText);
-                                }
-                            }
-                            // Also check innerHTML for the link
-                            if (!data.link) {
-                                const innerHTML = cells[1].innerHTML;
-                                console.log('Checking innerHTML:', innerHTML);
-                                const linkMatch = innerHTML.match(/href="([^"]*)"/);
-                                if (linkMatch) {
-                                    let href = linkMatch[1];
-                                    href = href.replace(/&amp;/g, '&');
-                                    data.link = href;
-                                    console.log('Extracted link from innerHTML:', href);
-                                }
-                            }
-                            break;
-                    }
-                }
-            });
-            
-            console.log('Extracted data so far:', data);
-            
-            // If we still don't have a proper link, construct it from the data
-            if (!data.link || !data.link.startsWith('https://form.fillout.com')) {
-                console.log('No valid link found, constructing from data...');
-                if (data.address && data.meterNumber && data.locId && data.meterType && data.meterStyle) {
-                    // Construct the URL with proper encoding, now including volts
-                    const params = new URLSearchParams({
-                        'Address': data.address,
-                        'Meter_Number': data.meterNumber,
-                        'Meter_Type': data.meterType,
-                        'Meter_Style': data.meterStyle,
-                        'Loc_ID': data.locId
-                    });
-                    
-                    // Add volts if available
-                    if (data.volts) {
-                        params.append('Volts', data.volts);
-                    }
-                    
-                    data.link = `${FILLOUT_FORM_BASE_URL}?${params.toString()}`;
-                    console.log('Constructed link:', data.link);
-                } else {
-                    console.log('Missing required data for link construction:', {
-                        address: data.address,
-                        meterNumber: data.meterNumber,
-                        locId: data.locId,
-                        meterType: data.meterType,
-                        meterStyle: data.meterStyle,
-                        volts: data.volts,
-                        locationStatus: data.locationStatus,
-                        billingMultiplier: data.billingMultiplier,
-                        keyAccount: data.keyAccount
-                    });
-                }
-            }
-            
-            console.log('Final extracted data:', data);
-            return data;
-        }
-
-        // Enhanced audit function that can find data by meter ID
-        function startAuditWithId(meterId) {
-            console.log('startAuditWithId called with:', meterId);
-            
-            // Try to get data by meter-specific key first
-            const dataKey = `meterData_${meterId}`;
-            let meterData = window[dataKey];
-            
-            // Fallback to currentMeterData if available
-            if (!meterData) {
-                meterData = window.currentMeterData;
-            }
-            
-            console.log('Found meter data:', meterData);
-            
-            if (!meterData) {
-                console.log('No meter data found for:', meterId);
-                showError('No meter data available. Please close and reopen the marker popup.');
-                return;
-            }
-            
-            // Check if data is too old (older than 10 minutes)
-            const dataAge = Date.now() - (meterData.timestamp || 0);
-            if (dataAge > 600000) { // 10 minutes in milliseconds
-                console.log('Meter data is stale, age:', dataAge);
-                showError('Meter data is stale. Please close and reopen the marker popup.');
-                return;
-            }
-            
-            const auditLink = meterData.link;
-            
-            console.log('Starting audit for meter:', meterData.name);
-            console.log('Audit link:', auditLink);
-            
-            if (!auditLink || auditLink === 'undefined' || auditLink === 'null' || auditLink === '') {
-                showError('Unable to generate audit link for this meter. Please check the meter data.');
-                return;
-            }
-            
-            // Validate the link format
-            if (!auditLink.startsWith('https://form.fillout.com')) {
-                showError('Invalid audit link format. Expected FillOut form URL.');
-                return;
-            }
-            
-            // Close popup
-            if (currentPopup) {
-                currentPopup.remove();
-                currentPopup = null;
-            }
-            
-            // Simply open the link
-            try {
-                window.open(auditLink, '_blank');
-                console.log('Audit form opened successfully');
-            } catch (error) {
-                console.error('Error opening audit form:', error);
-                showError('Error opening audit form: ' + error.message);
-            }
-        }
-
-        // Keep the original function for backward compatibility
-        function startAuditSimple() {
-            console.log('startAuditSimple called (fallback)');
-            
-            if (!window.currentMeterData) {
-                console.log('No currentMeterData found');
-                showError('No meter data available. Please close and reopen the marker popup.');
-                return;
-            }
-            
-            // Use the enhanced function
-            startAuditWithId(window.currentMeterData.name);
         }
 
         // Check Google Sheets for completed audits
         async function checkCompletedAudits() {
             try {
-                console.log('Checking for completed audits...');
                 const response = await fetch(GOOGLE_SHEETS_CSV_URL);
                 
                 if (!response.ok) {
-                    console.log('Could not fetch spreadsheet data:', response.status);
                     return;
                 }
                 
                 const csvData = await response.text();
-                console.log('Raw CSV sample (last 500 characters):', csvData.slice(-500));
-                
                 const lines = csvData.split('\n');
                 
                 if (lines.length < 2) {
-                    console.log('No data found in spreadsheet');
                     return;
                 }
                 
                 // Parse CSV headers
                 const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-                console.log('Spreadsheet headers:', headers);
-                console.log('Headers with indices:', headers.map((h, i) => `${i}: ${h}`));
                 
                 // Find the relevant column indices - be more specific about which columns to use
                 const meterNumberIndex = headers.findIndex(h => 
@@ -1279,15 +1021,12 @@
                 const finalMeterIndex = meterNumberIndex !== -1 ? meterNumberIndex : fallbackMeterIndex;
                 const finalStatusIndex = statusIndex !== -1 ? statusIndex : fallbackStatusIndex;
                 
-                console.log('Meter Number column index:', finalMeterIndex, `(${headers[finalMeterIndex]})`);
-                console.log('Status column index:', finalStatusIndex, `(${headers[finalStatusIndex]})`);
-                console.log('All Status columns:', headers.map((h, i) => h.toLowerCase().includes('status') ? `${i}: ${h}` : null).filter(Boolean));
-                
                 if (finalMeterIndex === -1 || finalStatusIndex === -1) {
-                    console.log('Required columns not found in spreadsheet');
-                    console.log('Headers available:', headers);
                     return;
                 }
+                
+                // Create a new set of currently completed meters from the spreadsheet
+                const currentlyCompleted = new Set();
                 
                 // Parse CSV properly handling quoted fields with commas
                 function parseCSVLine(line) {
@@ -1359,64 +1098,6 @@
                     }
                 }
                 
-                // Check each row for completed status
-                for (let i = 1; i < lines.length; i++) {
-                    const rawLine = lines[i];
-                    const row = rawLine.split(',').map(cell => cell.trim().replace(/"/g, ''));
-                    
-                    if (row.length > Math.max(finalMeterIndex, finalStatusIndex)) {
-                        const meterNumber = row[finalMeterIndex];
-                        let status = row[finalStatusIndex];
-                        
-                        // Fallback: check adjacent columns for status if primary is empty
-                        if (!status || status.length === 0) {
-                            // Check one column to the right
-                            if (finalStatusIndex + 1 < row.length && row[finalStatusIndex + 1]) {
-                                status = row[finalStatusIndex + 1];
-                                console.log(`  Found status in adjacent column for ${meterNumber}: "${status}"`);
-                            }
-                            // Check one column to the left  
-                            else if (finalStatusIndex - 1 >= 0 && row[finalStatusIndex - 1]) {
-                                status = row[finalStatusIndex - 1];
-                                console.log(`  Found status in previous column for ${meterNumber}: "${status}"`);
-                            }
-                        }
-                        
-                        // Show raw line for problematic meters
-                        if (meterNumber === 'E202443PPX' || meterNumber === 'E201984PPX') {
-                            console.log(`🔍 DEBUGGING METER ${meterNumber}:`);
-                            console.log(`  Raw CSV line: "${rawLine}"`);
-                            console.log(`  Split into array:`, row);
-                            console.log(`  Meter at index ${finalMeterIndex}: "${meterNumber}"`);
-                            console.log(`  Status at index ${finalStatusIndex}: "${row[finalStatusIndex]}"`);
-                            console.log(`  Status at index ${finalStatusIndex + 1}: "${row[finalStatusIndex + 1]}"`);
-                            console.log(`  Final status used: "${status}"`);
-                        }
-                        
-                        console.log(`Row ${i}: Meter=${meterNumber}, Status=${status}`);
-                        
-                        // Add detailed debugging for empty status
-                        if (meterNumber && meterNumber.length > 0) {
-                            if (status && status.length > 0) {
-                                if (status.toLowerCase() === 'complete') {
-                                    currentlyCompleted.add(meterNumber);
-                                    console.log(`Added to completed set: ${meterNumber}`);
-                                }
-                            } else {
-                                console.log(`Skipping row ${i} - invalid data: meter="${meterNumber}", status="${status}"`);
-                            }
-                        }
-                    } else {
-                        console.log(`Skipping row ${i} - insufficient columns: ${row.length} vs required ${Math.max(meterNumberIndex, statusIndex) + 1}`);
-                    }
-                }
-                
-                console.log('Currently completed meters from spreadsheet:', [...currentlyCompleted]);
-                console.log('Previously completed meters in memory:', [...completedMeterIds]);
-                
-                // Debug: Show first few meters from allMeters for comparison
-                console.log('Sample meter names from GeoJSON:', allMeters.slice(0, 5).map(m => m.properties.name));
-                
                 // Find newly completed meters
                 const newCompletions = [...currentlyCompleted].filter(meter => !completedMeterIds.has(meter));
                 
@@ -1426,14 +1107,12 @@
                 let mapNeedsUpdate = false;
                 
                 if (newCompletions.length > 0) {
-                    console.log('Found newly completed meters:', newCompletions);
                     newCompletions.forEach(meter => completedMeterIds.add(meter));
                     mapNeedsUpdate = true;
                     showInfo(`${newCompletions.length} audit(s) completed! Markers removed.`);
                 }
                 
                 if (noLongerCompleted.length > 0) {
-                    console.log('Found meters no longer completed:', noLongerCompleted);
                     noLongerCompleted.forEach(meter => completedMeterIds.delete(meter));
                     mapNeedsUpdate = true;
                     showInfo(`${noLongerCompleted.length} meter(s) status changed. Markers restored.`);
@@ -1456,36 +1135,8 @@
 
         // Start periodic status checking
         function startStatusChecking() {
-            // Check immediately
-            checkCompletedAudits();
-            
-            // Then check every 30 seconds
-            if (statusCheckInterval) {
-                clearInterval(statusCheckInterval);
-            }
-            
-            statusCheckInterval = setInterval(() => {
-                checkCompletedAudits();
-            }, 30000); // Check every 30 seconds
-        }
-
-        // Stop status checking
-        function stopStatusChecking() {
-            if (statusCheckInterval) {
-                clearInterval(statusCheckInterval);
-                statusCheckInterval = null;
-            }
-        }
-
-        // Update statistics
-        function updateStats() {
-            const total = allMeters.length;
-            const completed = completedMeterIds.size;
-            const pending = total - completed;
-            
-            document.getElementById('total-meters').textContent = `Total Meters: ${total}`;
-            document.getElementById('pending-meters').textContent = `Pending: ${pending}`;
-            document.getElementById('completed-meters').textContent = `Completed: ${completed}`;
+            // Check every 30 seconds
+            statusCheckInterval = setInterval(checkCompletedAudits, 30000);
         }
 
         // Refresh data
@@ -1513,67 +1164,36 @@
             });
         }
 
-        // Show error message
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            errorDiv.style.backgroundColor = '#f8d7da';
-            errorDiv.style.color = '#721c24';
-            document.getElementById('loading').style.display = 'none';
-            
-            setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 10000);
-        }
-
         // Show info message
         function showInfo(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            errorDiv.style.backgroundColor = '#d4edda';
-            errorDiv.style.color = '#155724';
-            
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'info-message';
+            infoDiv.textContent = message;
+            document.body.appendChild(infoDiv);
+
             setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 5000);
+                if (infoDiv.parentNode) {
+                    infoDiv.parentNode.removeChild(infoDiv);
+                }
+            }, 4000);
         }
 
-        // Check if Mapbox GL JS loaded successfully
-        function checkMapboxLoad() {
-            if (typeof mapboxgl === 'undefined') {
-                showError('Mapbox GL JS failed to load. Please check your internet connection.');
-                return false;
-            }
-            return true;
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.parentNode.removeChild(errorDiv);
+                }
+            }, 6000);
         }
 
-        // Initialize when page loads
-        window.addEventListener('load', function() {
-            if (checkMapboxLoad()) {
-                initializeMap();
-            }
-        });
-
-        // Handle offline/online events
-        window.addEventListener('online', function() {
-            refreshData();
-        });
-
-        window.addEventListener('offline', function() {
-            showError('You are currently offline. Some features may not work properly.');
-        });
-
-        // Clean up intervals when page unloads
-        window.addEventListener('beforeunload', function() {
-            stopStatusChecking();
-            
-            // Stop location watching
-            if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
-            }
-        });
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', initMap);
     </script>
 </body>
 </html>
