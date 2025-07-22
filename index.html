@@ -1224,14 +1224,19 @@
                         
                         console.log(`Row ${i}: Meter=${meterNumber}, Status=${status}`);
                         
-                        // More strict checking for valid data
-                        if (meterNumber && meterNumber.length > 0 && status && status.length > 0) {
-                            if (status.toLowerCase() === 'complete') {
-                                currentlyCompleted.add(meterNumber);
-                                console.log(`Added to completed set: ${meterNumber}`);
+                        // Add detailed debugging for empty status
+                        if (meterNumber && meterNumber.length > 0) {
+                            console.log(`  - Meter "${meterNumber}" has status: "${status}" (type: ${typeof status}, length: ${status ? status.length : 'N/A'})`);
+                            
+                            if (status && status.length > 0) {
+                                console.log(`  - Status comparison: "${status.toLowerCase()}" === "complete" ? ${status.toLowerCase() === 'complete'}`);
+                                if (status.toLowerCase() === 'complete') {
+                                    currentlyCompleted.add(meterNumber);
+                                    console.log(`Added to completed set: ${meterNumber}`);
+                                }
+                            } else {
+                                console.log(`  - Skipping "${meterNumber}" - status is empty/null`);
                             }
-                        } else {
-                            console.log(`Skipping row ${i} - invalid data: meter="${meterNumber}", status="${status}"`);
                         }
                     } else {
                         console.log(`Skipping row ${i} - insufficient columns: ${row.length} vs required ${Math.max(meterNumberIndex, statusIndex) + 1}`);
@@ -1240,6 +1245,9 @@
                 
                 console.log('Currently completed meters from spreadsheet:', [...currentlyCompleted]);
                 console.log('Previously completed meters in memory:', [...completedMeterIds]);
+                
+                // Debug: Show first few meters from allMeters for comparison
+                console.log('Sample meter names from GeoJSON:', allMeters.slice(0, 5).map(m => m.properties.name));
                 
                 // Find newly completed meters
                 const newCompletions = [...currentlyCompleted].filter(meter => !completedMeterIds.has(meter));
