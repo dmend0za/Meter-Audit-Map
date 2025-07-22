@@ -349,7 +349,7 @@
     </style>
 </head>
 <body>
-    <div id="map"></div>
+            <main id="map" role="main" aria-label="Interactive meter location map"></main>
     <div id="loading" class="loading">Loading meter locations...</div>
     <div id="error" class="error" style="display: none;"></div>
     <div id="stats" class="stats">
@@ -605,48 +605,52 @@
             legend.id = 'meter-legend';
             legend.className = 'meter-legend';
             legend.innerHTML = `
-                <div class="legend-title">Meter Styles</div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #f97316; border-color: #ffffff;"></div>
-                    <span>1S</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #3b82f6; border-color: #ffffff;"></div>
-                    <span>2S</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #7f00ff; border-color: #ffffff;"></div>
-                    <span>4S</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #eab308; border-color: #ffffff;"></div>
-                    <span>6S</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #ef4444; border-color: #ffffff;"></div>
-                    <span>9S</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #006400; border-color: #ffffff;"></div>
-                    <span>12S</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #000000; border-color: #ffffff;"></div>
-                    <span>16S</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #a16207; border-color: #ffffff;"></div>
-                    <span>35S</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #ffffff; border-color: #333333;"></div>
-                    <span>Other</span>
-                </div>
-                <div class="legend-divider"></div>
-                <div class="legend-item special-item">
-                    <div class="legend-color" style="background-color: #c9d2da; border-color: #000000;"></div>
-                    <span><strong>Key Account</strong></span>
-                </div>
+                <h3 class="legend-title">Meter Styles</h3>
+                <ul class="legend-list" role="list">
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #f97316; border-color: #ffffff;" aria-hidden="true"></div>
+                        <span>1S</span>
+                    </li>
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #3b82f6; border-color: #ffffff;" aria-hidden="true"></div>
+                        <span>2S</span>
+                    </li>
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #7f00ff; border-color: #ffffff;" aria-hidden="true"></div>
+                        <span>4S</span>
+                    </li>
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #eab308; border-color: #ffffff;" aria-hidden="true"></div>
+                        <span>6S</span>
+                    </li>
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #ef4444; border-color: #ffffff;" aria-hidden="true"></div>
+                        <span>9S</span>
+                    </li>
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #006400; border-color: #ffffff;" aria-hidden="true"></div>
+                        <span>12S</span>
+                    </li>
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #000000; border-color: #ffffff;" aria-hidden="true"></div>
+                        <span>16S</span>
+                    </li>
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #a16207; border-color: #ffffff;" aria-hidden="true"></div>
+                        <span>35S</span>
+                    </li>
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #ffffff; border-color: #333333;" aria-hidden="true"></div>
+                        <span>Other</span>
+                    </li>
+                </ul>
+                <div class="legend-divider" aria-hidden="true"></div>
+                <ul class="legend-list" role="list">
+                    <li class="legend-item special-item" role="listitem">
+                        <div class="legend-color" style="background-color: #c9d2da; border-color: #000000;" aria-hidden="true"></div>
+                        <span><strong>Key Account</strong></span>
+                    </li>
+                </ul>
             `;
             
             // Add legend to map container
