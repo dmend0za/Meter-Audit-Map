@@ -1184,6 +1184,8 @@
                 }
                 
                 const csvData = await response.text();
+                console.log('Raw CSV sample (last 500 characters):', csvData.slice(-500));
+                
                 const lines = csvData.split('\n');
                 
                 if (lines.length < 2) {
@@ -1216,26 +1218,34 @@
                 
                 // Check each row for completed status
                 for (let i = 1; i < lines.length; i++) {
-                    const row = lines[i].split(',').map(cell => cell.trim().replace(/"/g, ''));
+                    const rawLine = lines[i];
+                    const row = rawLine.split(',').map(cell => cell.trim().replace(/"/g, ''));
                     
                     if (row.length > Math.max(meterNumberIndex, statusIndex)) {
                         const meterNumber = row[meterNumberIndex];
                         const status = row[statusIndex];
                         
+                        // Show raw line for problematic meters
+                        if (meterNumber === 'E202443PPX' || meterNumber === 'E201984PPX') {
+                            console.log(`🔍 DEBUGGING METER ${meterNumber}:`);
+                            console.log(`  Raw CSV line: "${rawLine}"`);
+                            console.log(`  Split into array:`, row);
+                            console.log(`  Meter at index ${meterNumberIndex}: "${meterNumber}"`);
+                            console.log(`  Status at index ${statusIndex}: "${status}"`);
+                            console.log(`  Status cell raw: "${row[statusIndex]}"`);
+                        }
+                        
                         console.log(`Row ${i}: Meter=${meterNumber}, Status=${status}`);
                         
                         // Add detailed debugging for empty status
                         if (meterNumber && meterNumber.length > 0) {
-                            console.log(`  - Meter "${meterNumber}" has status: "${status}" (type: ${typeof status}, length: ${status ? status.length : 'N/A'})`);
-                            
                             if (status && status.length > 0) {
-                                console.log(`  - Status comparison: "${status.toLowerCase()}" === "complete" ? ${status.toLowerCase() === 'complete'}`);
                                 if (status.toLowerCase() === 'complete') {
                                     currentlyCompleted.add(meterNumber);
                                     console.log(`Added to completed set: ${meterNumber}`);
                                 }
                             } else {
-                                console.log(`  - Skipping "${meterNumber}" - status is empty/null`);
+                                console.log(`Skipping row ${i} - invalid data: meter="${meterNumber}", status="${status}"`);
                             }
                         }
                     } else {
