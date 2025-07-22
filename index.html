@@ -1196,6 +1196,7 @@
                 // Parse CSV headers
                 const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
                 console.log('Spreadsheet headers:', headers);
+                console.log('Headers with indices:', headers.map((h, i) => `${i}: ${h}`));
                 
                 // Find the relevant column indices
                 const meterNumberIndex = headers.findIndex(h => 
@@ -1207,6 +1208,8 @@
                 
                 console.log('Meter Number column index:', meterNumberIndex);
                 console.log('Status column index:', statusIndex);
+                console.log('Meter Number header:', headers[meterNumberIndex]);
+                console.log('Status header:', headers[statusIndex]);
                 
                 if (meterNumberIndex === -1 || statusIndex === -1) {
                     console.log('Required columns not found in spreadsheet');
