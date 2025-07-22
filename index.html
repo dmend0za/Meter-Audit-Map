@@ -1224,9 +1224,17 @@
                         
                         console.log(`Row ${i}: Meter=${meterNumber}, Status=${status}`);
                         
-                        if (meterNumber && status && status.toLowerCase() === 'complete') {
-                            currentlyCompleted.add(meterNumber);
+                        // More strict checking for valid data
+                        if (meterNumber && meterNumber.length > 0 && status && status.length > 0) {
+                            if (status.toLowerCase() === 'complete') {
+                                currentlyCompleted.add(meterNumber);
+                                console.log(`Added to completed set: ${meterNumber}`);
+                            }
+                        } else {
+                            console.log(`Skipping row ${i} - invalid data: meter="${meterNumber}", status="${status}"`);
                         }
+                    } else {
+                        console.log(`Skipping row ${i} - insufficient columns: ${row.length} vs required ${Math.max(meterNumberIndex, statusIndex) + 1}`);
                     }
                 }
                 
