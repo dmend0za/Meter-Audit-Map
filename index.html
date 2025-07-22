@@ -1,4 +1,64 @@
-<!DOCTYPE html>
+// Extract meter data from HTML description
+        function extractMeterData(htmlString) {
+            const data = {};
+            
+            if (!htmlString || typeof htmlString !== 'string') {
+                return data;
+            }
+            
+            try {
+                // Create a DOM parser to parse the HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlString, 'text/html');
+                
+                // Find all table rows
+                const rows = doc.querySelectorAll('tr');
+                
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 2) {
+                        const key = cells[0].textContent.trim();
+                        const valueCell = cells[1];
+                        
+                        // Check if the cell contains a link
+                        const link = valueCell.querySelector('a');
+                        if (key === 'LINK' && link) {
+                            data.link = link.href;
+                        } else {
+                            const value = valueCell.textContent.trim();
+                            
+                            // Map the keys to more readable names
+                            switch (key) {
+                                case 'LOCID':
+                                case 'Loc_ID':
+                                    data.locId = value;
+                                    break;
+                                case 'PHYS_ADD':
+                                    data.address = value;
+                                    break;
+                                case 'Meter_Numb':
+                                    data.meterNumber = value;
+                                    break;
+                                case 'Meter_Type':
+                                    data.meterType = value;
+                                    break;
+                                case 'Meter_Styl':
+                                    data.meterStyle = value;
+                                    break;
+                                case 'volts':
+                                    data.volts = value;
+                                    break;
+                                case 'location_s':
+                                    data.locationStatus = value;
+                                    break;
+                                case 'Billing_Mu':
+                                    data.billingMultiplier = value;
+                                    break;
+                                case 'Key_Accoun':
+                                    data.keyAccount = value;
+                                    break;
+                            }
+                        }<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -666,8 +726,6 @@
                 type: 'FeatureCollection',
                 features: pendingMeters
             };
-
-            console.log('Sample meter with styling properties:', pendingMeters[0]?.properties);
 
             // Add source if it doesn't exist
             if (map.getSource('meters')) {
@@ -1361,7 +1419,6 @@
 
         // Refresh data
         function refreshData() {
-            console.log('Manual refresh triggered');
             const loadingElement = document.getElementById('loading');
             loadingElement.style.display = 'block';
             
@@ -1376,7 +1433,6 @@
                 // Ensure loading is hidden after everything completes
                 window.isRefreshing = false;
                 loadingElement.style.display = 'none';
-                console.log('Refresh completed successfully');
             }).catch((error) => {
                 console.error('Error during refresh:', error);
                 // Always hide loading even if there's an error
