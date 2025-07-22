@@ -1198,21 +1198,32 @@
                 console.log('Spreadsheet headers:', headers);
                 console.log('Headers with indices:', headers.map((h, i) => `${i}: ${h}`));
                 
-                // Find the relevant column indices
+                // Find the relevant column indices - be more specific about which columns to use
                 const meterNumberIndex = headers.findIndex(h => 
-                    h.toLowerCase().includes('meter') && h.toLowerCase().includes('number')
+                    h === 'Meter Number' // Exact match for the FillOut form field
                 );
                 const statusIndex = headers.findIndex(h => 
+                    h === 'Status' // Exact match for the first Status column
+                );
+                
+                // Fallback to broader search if exact matches not found
+                const fallbackMeterIndex = headers.findIndex(h => 
+                    h.toLowerCase().includes('meter') && h.toLowerCase().includes('number')
+                );
+                const fallbackStatusIndex = headers.findIndex(h => 
                     h.toLowerCase().includes('status')
                 );
                 
-                console.log('Meter Number column index:', meterNumberIndex);
-                console.log('Status column index:', statusIndex);
-                console.log('Meter Number header:', headers[meterNumberIndex]);
-                console.log('Status header:', headers[statusIndex]);
+                const finalMeterIndex = meterNumberIndex !== -1 ? meterNumberIndex : fallbackMeterIndex;
+                const finalStatusIndex = statusIndex !== -1 ? statusIndex : fallbackStatusIndex;
                 
-                if (meterNumberIndex === -1 || statusIndex === -1) {
+                console.log('Meter Number column index:', finalMeterIndex, `(${headers[finalMeterIndex]})`);
+                console.log('Status column index:', finalStatusIndex, `(${headers[finalStatusIndex]})`);
+                console.log('All Status columns:', headers.map((h, i) => h.toLowerCase().includes('status') ? `${i}: ${h}` : null).filter(Boolean));
+                
+                if (finalMeterIndex === -1 || finalStatusIndex === -1) {
                     console.log('Required columns not found in spreadsheet');
+                    console.log('Headers available:', headers);
                     return;
                 }
                 
@@ -1224,18 +1235,33 @@
                     const rawLine = lines[i];
                     const row = rawLine.split(',').map(cell => cell.trim().replace(/"/g, ''));
                     
-                    if (row.length > Math.max(meterNumberIndex, statusIndex)) {
-                        const meterNumber = row[meterNumberIndex];
-                        const status = row[statusIndex];
+                    if (row.length > Math.max(finalMeterIndex, finalStatusIndex)) {
+                        const meterNumber = row[finalMeterIndex];
+                        let status = row[finalStatusIndex];
+                        
+                        // Fallback: check adjacent columns for status if primary is empty
+                        if (!status || status.length === 0) {
+                            // Check one column to the right
+                            if (finalStatusIndex + 1 < row.length && row[finalStatusIndex + 1]) {
+                                status = row[finalStatusIndex + 1];
+                                console.log(`  Found status in adjacent column for ${meterNumber}: "${status}"`);
+                            }
+                            // Check one column to the left  
+                            else if (finalStatusIndex - 1 >= 0 && row[finalStatusIndex - 1]) {
+                                status = row[finalStatusIndex - 1];
+                                console.log(`  Found status in previous column for ${meterNumber}: "${status}"`);
+                            }
+                        }
                         
                         // Show raw line for problematic meters
                         if (meterNumber === 'E202443PPX' || meterNumber === 'E201984PPX') {
                             console.log(`🔍 DEBUGGING METER ${meterNumber}:`);
                             console.log(`  Raw CSV line: "${rawLine}"`);
                             console.log(`  Split into array:`, row);
-                            console.log(`  Meter at index ${meterNumberIndex}: "${meterNumber}"`);
-                            console.log(`  Status at index ${statusIndex}: "${status}"`);
-                            console.log(`  Status cell raw: "${row[statusIndex]}"`);
+                            console.log(`  Meter at index ${finalMeterIndex}: "${meterNumber}"`);
+                            console.log(`  Status at index ${finalStatusIndex}: "${row[finalStatusIndex]}"`);
+                            console.log(`  Status at index ${finalStatusIndex + 1}: "${row[finalStatusIndex + 1]}"`);
+                            console.log(`  Final status used: "${status}"`);
                         }
                         
                         console.log(`Row ${i}: Meter=${meterNumber}, Status=${status}`);
