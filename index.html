@@ -464,15 +464,15 @@
                         ['in', ['get', 'meterStyle'], ['literal', ['12S', '9S', '4S', '2S', '6S', '1S', '35S']]], '#ffffff', // White outline for colored markers
                         '#333333' // Dark outline for white "Other" markers
                     ],
-                    // UPDATE: Data-driven opacity trick turns completed markers translucent (25% opacity)
+                    // UPDATE: Data-driven opacity trick turns completed markers translucent (50% opacity)
                     'circle-opacity': [
                         'case',
-                        ['get', 'isCompleted'], 0.35,
+                        ['get', 'isCompleted'], 0.50,
                         1.0
                     ],
                     'circle-stroke-opacity': [
                         'case',
-                        ['get', 'isCompleted'], 0.35,
+                        ['get', 'isCompleted'], 0.50,
                         1.0
                     ]
                 }
@@ -522,7 +522,7 @@
                     // UPDATE: Make the text label translucent if audited
                     'text-opacity': [
                         'case',
-                        ['get', 'isCompleted'], 0.35,
+                        ['get', 'isCompleted'], 0.80,
                         1.0
                     ]
                 }
