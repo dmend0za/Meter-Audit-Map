@@ -467,12 +467,12 @@
                     // UPDATE: Data-driven opacity trick turns completed markers translucent (25% opacity)
                     'circle-opacity': [
                         'case',
-                        ['get', 'isCompleted'], 0.25,
+                        ['get', 'isCompleted'], 0.35,
                         1.0
                     ],
                     'circle-stroke-opacity': [
                         'case',
-                        ['get', 'isCompleted'], 0.25,
+                        ['get', 'isCompleted'], 0.35,
                         1.0
                     ]
                 }
@@ -522,7 +522,7 @@
                     // UPDATE: Make the text label translucent if audited
                     'text-opacity': [
                         'case',
-                        ['get', 'isCompleted'], 0.25,
+                        ['get', 'isCompleted'], 0.35,
                         1.0
                     ]
                 }
