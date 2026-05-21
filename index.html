@@ -330,7 +330,7 @@
     </section>
 
     <aside class="legend" role="complementary" aria-label="Map legend">
-        </aside>
+    </aside>
 
     <main id="map" role="main" aria-label="Interactive meter location map"></main>
 
@@ -463,6 +463,17 @@
                         ['==', ['get', 'meterStyle'], '16S'], '#ffffff', // White outline for black marker
                         ['in', ['get', 'meterStyle'], ['literal', ['12S', '9S', '4S', '2S', '6S', '1S', '35S']]], '#ffffff', // White outline for colored markers
                         '#333333' // Dark outline for white "Other" markers
+                    ],
+                    // UPDATE: Data-driven opacity trick turns completed markers translucent (25% opacity)
+                    'circle-opacity': [
+                        'case',
+                        ['get', 'isCompleted'], 0.25,
+                        1.0
+                    ],
+                    'circle-stroke-opacity': [
+                        'case',
+                        ['get', 'isCompleted'], 0.25,
+                        1.0
                     ]
                 }
             });
@@ -484,7 +495,9 @@
                 paint: {
                     'text-color': '#ff0000', // Bright red
                     'text-halo-color': '#ffffff', // White halo for visibility
-                    'text-halo-width': 2
+                    'text-halo-width': 2,
+                    // UPDATE: Keep the X translucent as well to fit the styled pattern
+                    'text-opacity': 0.40
                 }
             });
 
@@ -505,7 +518,13 @@
                 paint: {
                     'text-color': '#333',
                     'text-halo-color': '#ffffff',
-                    'text-halo-width': 1
+                    'text-halo-width': 1,
+                    // UPDATE: Make the text label translucent if audited
+                    'text-opacity': [
+                        'case',
+                        ['get', 'isCompleted'], 0.25,
+                        1.0
+                    ]
                 }
             });
 
@@ -720,18 +739,16 @@
                 
             } catch (error) {
                 console.error('Error loading meter data:', error);
-                //showError(`Failed to load meter data: ${error.message}`);
                 document.getElementById('loading').style.display = 'none';
             }
         }
 
         /**
-         * Filters meters based on completion status and updates the Mapbox source.
-         * Key Account meters are always shown, but marked if completed.
+         * Maps meter properties for style expressions without filtering features out.
          */
         function addMarkersToMap() {
-            // Transform allMeters to include `isKeyAccount` and `isCompleted` properties
-            // These properties are then used directly in Mapbox style expressions.
+            // UPDATE: Removed the .filter section. 
+            // We now map across ALL features so completed features stay on the map and turn translucent instead.
             const updatedFeatures = allMeters.map(meter => {
                 const meterData = extractMeterData(meter.properties.description?.value || meter.properties.description || '');
                 const isKeyAccount = meterData.keyAccount && meterData.keyAccount.toUpperCase() !== 'NULL';
@@ -756,9 +773,6 @@
                         link: meterData.link // Pass the link for the audit button
                     }
                 };
-            }).filter(meter => {
-                // Filter out non-Key Account meters that are completed
-                return meter.properties.isKeyAccount || !meter.properties.isCompleted;
             });
 
             const geojsonData = {
@@ -872,8 +886,6 @@
                 });
             } catch (error) {
                 console.warn('Error parsing meter data HTML (could be plain text):', error);
-                // If HTML parsing fails, it might be plain text, or an empty description
-                // In such cases, data will remain empty, which is fine.
             }
             
             return data;
@@ -896,9 +908,6 @@
             if (props.meterStyle) auditFormLink += `&Meter_Style=${encodeURIComponent(props.meterStyle)}`;
             if (props.volts) auditFormLink += `&Volts=${encodeURIComponent(props.volts)}`;
             if (props.locId) auditFormLink += `&Loc_ID=${encodeURIComponent(props.locId)}`;
-            // The `link` property from GeoJSON isn't directly used here for the Fillout form,
-            // as we are constructing it dynamically. If `props.link` was the *exact* pre-populated
-            // Fillout URL, you could use that instead.
             
             const popupContent = `
                 <div class="popup-header">${props.address || 'Unknown Address'}</div>
@@ -1027,11 +1036,23 @@
                         <div class="legend-color" style="background: repeating-linear-gradient(45deg, #ff0000, #ff0000 5px, #ffffff 5px, #ffffff 10px); border-color: #000000;" aria-hidden="true"></div>
                         <span>Completed Key Account (✕)</span>
                     </li>
+                    <!-- UPDATE: Added styled item in the legend so users know faded markers mean "Audited" -->
+                    <li class="legend-item" role="listitem">
+                        <div class="legend-color" style="background-color: #3b82f6; border-color: #ffffff; opacity: 0.25;" aria-hidden="true"></div>
+                        <span style="color: #888;">Audited / Translucent</span>
+                    </li>
                 </ul>
             `;
         }
 
         // --- Google Sheets Integration and Refresh ---
+
+        /**
+         * Starts automated periodic checking.
+         */
+        function startStatusChecking() {
+            statusCheckInterval = setInterval(checkCompletedAudits, 30000);
+        }
 
         /**
          * Fetches and parses the Google Sheet CSV to determine completed audits.
@@ -1043,7 +1064,6 @@
                 
                 if (!response.ok) {
                     console.warn(`Failed to fetch Google Sheet CSV: HTTP ${response.status} ${response.statusText}`);
-                    // Don't throw here, just log, as we want the map to still load even if sheet fails
                     return; 
                 }
                 
@@ -1170,11 +1190,9 @@
             }
 
             // Reload both meter data and check completed audits
-            // Using Promise.allSettled to ensure both complete before hiding loading,
-            // even if one fails.
             Promise.allSettled([
-                loadMeterData(), // This will also call checkCompletedAudits internally
-                checkCompletedAudits() // Call explicitly again in case loadMeterData fails or to double-check
+                loadMeterData(), 
+                checkCompletedAudits() 
             ]).finally(() => {
                 loadingElement.style.display = 'none';
                 startStatusChecking(); // Restart the periodic check
@@ -1223,6 +1241,3 @@
     </script>
 </body>
 </html>
-
-
-
